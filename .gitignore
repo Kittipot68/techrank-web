@@ -43,3 +43,5 @@ next-env.d.ts
 # large datasets from scraper
 csv/
 *.csv
+
+.vercel
