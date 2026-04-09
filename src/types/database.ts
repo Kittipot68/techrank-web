@@ -48,6 +48,7 @@ export interface Database {
                     description: string | null
                     affiliate_url: string | null
                     image_url: string | null
+                    view_count: number
                     created_at: string
                 }
                 Insert: {
@@ -67,6 +68,7 @@ export interface Database {
                     description?: string | null
                     affiliate_url?: string | null
                     image_url?: string | null
+                    view_count?: number
                     created_at?: string
                 }
                 Update: {
@@ -86,6 +88,7 @@ export interface Database {
                     description?: string | null
                     affiliate_url?: string | null
                     image_url?: string | null
+                    view_count?: number
                     created_at?: string
                 }
                 Relationships: [
@@ -130,12 +133,65 @@ export interface Database {
                     }
                 ]
             }
+            product_ratings: {
+                Row: {
+                    id: string
+                    product_id: string
+                    rating: number
+                    fingerprint: string
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    product_id: string
+                    rating: number
+                    fingerprint: string
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    product_id?: string
+                    rating?: number
+                    fingerprint?: string
+                    created_at?: string
+                }
+                Relationships: [
+                    {
+                        foreignKeyName: "product_ratings_product_id_fkey"
+                        columns: ["product_id"]
+                        isOneToOne: false
+                        referencedRelation: "products"
+                        referencedColumns: ["id"]
+                    }
+                ]
+            }
+            newsletter_subscribers: {
+                Row: {
+                    id: string
+                    email: string
+                    created_at: string
+                }
+                Insert: {
+                    id?: string
+                    email: string
+                    created_at?: string
+                }
+                Update: {
+                    id?: string
+                    email?: string
+                    created_at?: string
+                }
+                Relationships: []
+            }
         }
         Views: {
             [_ in never]: never
         }
         Functions: {
-            [_ in never]: never
+            increment_view_count: {
+                Args: { p_id: string }
+                Returns: undefined
+            }
         }
         Enums: {
             [_ in never]: never

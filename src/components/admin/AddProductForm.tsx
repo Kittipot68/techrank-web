@@ -250,10 +250,40 @@ export default function AddProductForm({ categories }: AddProductFormProps) {
                     </div>
                 </div>
 
-                {/* URLs */}
-                <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700">🖼️ รูปสินค้า (URL)</label>
-                    <input type="url" {...register("image_url")} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border placeholder:text-gray-300" placeholder="https://..." />
+                {/* URLs and Image */}
+                <div className="md:col-span-2 space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">🖼️ รูปสินค้า (อัพโหลด หรือ URL)</label>
+                        <div className="flex gap-2 items-center">
+                            <input 
+                                type="file" 
+                                accept="image/*"
+                                onChange={async (e) => {
+                                    if (e.target.files && e.target.files[0]) {
+                                        const formData = new FormData();
+                                        formData.append('file', e.target.files[0]);
+                                        try {
+                                            const { uploadImage } = await import('@/app/actions/upload');
+                                            setValue("image_url", "กำลังอัพโหลด...");
+                                            const res = await uploadImage(formData);
+                                            if (res.url) {
+                                                setValue("image_url", res.url);
+                                            } else {
+                                                alert(res.error || "Upload failed");
+                                                setValue("image_url", "");
+                                            }
+                                        } catch (err) {
+                                            alert("Upload failed");
+                                            setValue("image_url", "");
+                                        }
+                                    }
+                                }}
+                                className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                            />
+                            <span className="text-sm text-gray-500">หรือ</span>
+                            <input type="url" {...register("image_url")} className="flex-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border placeholder:text-gray-400 text-sm" placeholder="กรอก URL รูปภาพ..." />
+                        </div>
+                    </div>
                 </div>
                 <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700">🔗 Affiliate URL</label>

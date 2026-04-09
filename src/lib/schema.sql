@@ -61,3 +61,23 @@ create table newsletter_subscribers (
   email text not null unique,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+-- Note: The following commands are for Supabase Storage.
+-- You should run these in the Supabase SQL editor to enable the image upload bucket.
+
+-- Create a bucket for product images if it doesn't exist
+insert into storage.buckets (id, name, public)
+values ('images', 'images', true)
+on conflict (id) do nothing;
+
+-- Create policy to allow public viewing
+create policy "Public Access"
+on storage.objects for select
+to public
+using ( bucket_id = 'images' );
+
+-- Create policy to allow anonymous/service role uploads (modify as needed for security)
+create policy "Allow Uploads"
+on storage.objects for insert
+to public
+with check ( bucket_id = 'images' );

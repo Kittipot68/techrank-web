@@ -162,10 +162,42 @@ export default function EditProductForm({ product, categories, specs: initialSpe
 
             {/* URLs */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">🖼️ รูปสินค้า (URL)</label>
-                    <input name="image_url" type="url" defaultValue={product.image_url || ""}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" />
+                <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">🖼️ รูปสินค้า (อัพโหลด หรือ URL)</label>
+                    <div className="flex gap-2 items-center flex-wrap">
+                        <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={async (e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                    const fileInput = e.target;
+                                    const urlInput = fileInput.nextElementSibling?.nextElementSibling as HTMLInputElement;
+                                    if (urlInput) urlInput.value = "กำลังอัพโหลด...";
+                                    
+                                    const formData = new FormData();
+                                    formData.append('file', e.target.files[0]);
+                                    
+                                    try {
+                                        const { uploadImage } = await import('@/app/actions/upload');
+                                        const res = await uploadImage(formData);
+                                        if (res.url && urlInput) {
+                                            urlInput.value = res.url;
+                                        } else {
+                                            alert(res.error || "Upload failed");
+                                            if (urlInput) urlInput.value = "";
+                                        }
+                                    } catch (err) {
+                                        alert("Upload failed");
+                                        if (urlInput) urlInput.value = "";
+                                    }
+                                }
+                            }}
+                            className="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                        />
+                        <span className="text-sm text-gray-500">หรือ</span>
+                        <input name="image_url" type="url" defaultValue={product.image_url || ""}
+                            className="flex-1 min-w-[200px] border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" placeholder="กรอก URL..." />
+                    </div>
                 </div>
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">🔗 Affiliate URL</label>

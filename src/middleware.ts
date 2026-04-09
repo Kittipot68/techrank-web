@@ -2,29 +2,27 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(req: NextRequest) {
-    const basicAuth = req.headers.get('authorization')
-
-    // Set your admin username and password here
-    // Format: username:password
-    // e.g. admin:techrank2026
-    const USER = process.env.ADMIN_USER || 'admin'
-    const PASSWORD = process.env.ADMIN_PASSWORD || 'password'
-
-    if (basicAuth) {
-        const authValue = basicAuth.split(' ')[1]
-        const [user, pwd] = atob(authValue).split(':')
-
-        if (user === USER && pwd === PASSWORD) {
-            return NextResponse.next()
-        }
+    const isAdminRoute = req.nextUrl.pathname.startsWith('/admin')
+    const isLoginRoute = req.nextUrl.pathname === '/admin/login'
+    
+    // Ignore non-admin routes
+    if (!isAdminRoute) {
+        return NextResponse.next()
     }
 
-    return new NextResponse('Auth required', {
-        status: 401,
-        headers: {
-            'WWW-Authenticate': 'Basic realm="Secure Area"',
-        },
-    })
+    const hasSession = req.cookies.has('admin_session')
+
+    // If trying to access /admin/login while logged in, redirect to /admin
+    if (isLoginRoute && hasSession) {
+        return NextResponse.redirect(new URL('/admin', req.url))
+    }
+
+    // If trying to access protected /admin routes without session, redirect to login
+    if (!isLoginRoute && !hasSession) {
+        return NextResponse.redirect(new URL('/admin/login', req.url))
+    }
+
+    return NextResponse.next()
 }
 
 export const config = {

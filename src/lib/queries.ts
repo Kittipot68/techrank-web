@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { unstable_cache } from "next/cache";
 
 // ============================================================
 //  Types
@@ -48,7 +49,7 @@ export type Category = {
 //  Category Queries
 // ============================================================
 
-export async function getAllCategories(): Promise<Category[]> {
+export const getAllCategories = unstable_cache(async (): Promise<Category[]> => {
     const { data, error } = await supabase
         .from("categories")
         .select("*")
@@ -59,9 +60,9 @@ export async function getAllCategories(): Promise<Category[]> {
         return [];
     }
     return data || [];
-}
+}, ['categories-all'], { revalidate: 300, tags: ['categories'] });
 
-export async function getCategoryBySlug(slug: string): Promise<Category | null> {
+export const getCategoryBySlug = unstable_cache(async (slug: string): Promise<Category | null> => {
     const { data, error } = await supabase
         .from("categories")
         .select("*")
@@ -70,13 +71,13 @@ export async function getCategoryBySlug(slug: string): Promise<Category | null> 
 
     if (error) return null;
     return data;
-}
+}, ['category-by-slug'], { revalidate: 300, tags: ['categories'] });
 
 // ============================================================
 //  Product Queries
 // ============================================================
 
-export async function getAllProducts(): Promise<ProductWithCategory[]> {
+export const getAllProducts = unstable_cache(async (): Promise<ProductWithCategory[]> => {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -87,9 +88,9 @@ export async function getAllProducts(): Promise<ProductWithCategory[]> {
         return [];
     }
     return (data as any) || [];
-}
+}, ['products-all'], { revalidate: 120, tags: ['products'] });
 
-export async function getTopProducts(limit = 3): Promise<ProductWithCategory[]> {
+export const getTopProducts = unstable_cache(async (limit = 3): Promise<ProductWithCategory[]> => {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -101,9 +102,9 @@ export async function getTopProducts(limit = 3): Promise<ProductWithCategory[]> 
         return [];
     }
     return (data as any) || [];
-}
+}, ['products-top'], { revalidate: 120, tags: ['products'] });
 
-export async function getProductsByCategory(categoryId: string): Promise<ProductWithCategory[]> {
+export const getProductsByCategory = unstable_cache(async (categoryId: string): Promise<ProductWithCategory[]> => {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -115,9 +116,9 @@ export async function getProductsByCategory(categoryId: string): Promise<Product
         return [];
     }
     return (data as any) || [];
-}
+}, ['products-by-category'], { revalidate: 120, tags: ['products'] });
 
-export async function getProductBySlug(slug: string): Promise<ProductWithCategory | null> {
+export const getProductBySlug = unstable_cache(async (slug: string): Promise<ProductWithCategory | null> => {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -137,9 +138,9 @@ export async function getProductBySlug(slug: string): Promise<ProductWithCategor
     }
 
     return null;
-}
+}, ['product-by-slug'], { revalidate: 120, tags: ['products', 'specs'] });
 
-export async function getProductsBySlugs(slugs: string[]): Promise<ProductWithCategory[]> {
+export const getProductsBySlugs = unstable_cache(async (slugs: string[]): Promise<ProductWithCategory[]> => {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -161,4 +162,4 @@ export async function getProductsBySlugs(slugs: string[]): Promise<ProductWithCa
         ...product,
         specs: (allSpecs || []).filter((s: any) => s.product_id === product.id),
     }));
-}
+}, ['products-by-slugs'], { revalidate: 120, tags: ['products', 'specs'] });

@@ -20,7 +20,7 @@ export const MOCK_CATEGORIES = [
     },
 ]
 
-export const MOCK_PRODUCTS: Product[] = [
+export const MOCK_PRODUCTS: any[] = [
     // Headphones
     {
         id: 'p1',
