@@ -48,7 +48,7 @@ export type Category = {
 //  Category Queries
 // ============================================================
 
-export const getAllCategories = unstable_cache(async (): Promise<Category[]> => {
+export async function getAllCategories(): Promise<Category[]> {
     const { data, error } = await supabase
         .from("categories")
         .select("*")
@@ -59,9 +59,9 @@ export const getAllCategories = unstable_cache(async (): Promise<Category[]> => 
         return [];
     }
     return data || [];
-}, ['categories-all'], { revalidate: 300, tags: ['categories'] });
+}
 
-export const getCategoryBySlug = unstable_cache(async (slug: string): Promise<Category | null> => {
+export async function getCategoryBySlug(slug: string): Promise<Category | null> {
     const { data, error } = await supabase
         .from("categories")
         .select("*")
@@ -70,13 +70,13 @@ export const getCategoryBySlug = unstable_cache(async (slug: string): Promise<Ca
 
     if (error) return null;
     return data;
-}, ['category-by-slug'], { revalidate: 300, tags: ['categories'] });
+}
 
 // ============================================================
 //  Product Queries
 // ============================================================
 
-export const getAllProducts = unstable_cache(async (): Promise<ProductWithCategory[]> => {
+export async function getAllProducts(): Promise<ProductWithCategory[]> {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -87,9 +87,9 @@ export const getAllProducts = unstable_cache(async (): Promise<ProductWithCatego
         return [];
     }
     return (data as any) || [];
-}, ['products-all'], { revalidate: 120, tags: ['products'] });
+}
 
-export const getTopProducts = unstable_cache(async (limit = 3): Promise<ProductWithCategory[]> => {
+export async function getTopProducts(limit = 3): Promise<ProductWithCategory[]> {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -101,9 +101,9 @@ export const getTopProducts = unstable_cache(async (limit = 3): Promise<ProductW
         return [];
     }
     return (data as any) || [];
-}, ['products-top'], { revalidate: 120, tags: ['products'] });
+}
 
-export const getProductsByCategory = unstable_cache(async (categoryId: string): Promise<ProductWithCategory[]> => {
+export async function getProductsByCategory(categoryId: string): Promise<ProductWithCategory[]> {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -115,9 +115,9 @@ export const getProductsByCategory = unstable_cache(async (categoryId: string): 
         return [];
     }
     return (data as any) || [];
-}, ['products-by-category'], { revalidate: 120, tags: ['products'] });
+}
 
-export const getProductBySlug = unstable_cache(async (slug: string): Promise<ProductWithCategory | null> => {
+export async function getProductBySlug(slug: string): Promise<ProductWithCategory | null> {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -126,7 +126,6 @@ export const getProductBySlug = unstable_cache(async (slug: string): Promise<Pro
 
     if (error) return null;
 
-    // Fetch specs separately
     if (data) {
         const { data: specs } = await supabase
             .from("specs")
@@ -137,9 +136,9 @@ export const getProductBySlug = unstable_cache(async (slug: string): Promise<Pro
     }
 
     return null;
-}, ['product-by-slug'], { revalidate: 120, tags: ['products', 'specs'] });
+}
 
-export const getProductsBySlugs = unstable_cache(async (slugs: string[]): Promise<ProductWithCategory[]> => {
+export async function getProductsBySlugs(slugs: string[]): Promise<ProductWithCategory[]> {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
@@ -150,7 +149,6 @@ export const getProductsBySlugs = unstable_cache(async (slugs: string[]): Promis
         return [];
     }
 
-    // Fetch specs for each product
     const productIds = (data || []).map((p: any) => p.id);
     const { data: allSpecs } = await supabase
         .from("specs")
@@ -161,4 +159,4 @@ export const getProductsBySlugs = unstable_cache(async (slugs: string[]): Promis
         ...product,
         specs: (allSpecs || []).filter((s: any) => s.product_id === product.id),
     }));
-}, ['products-by-slugs'], { revalidate: 120, tags: ['products', 'specs'] });
+}
