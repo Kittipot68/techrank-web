@@ -32,6 +32,9 @@ export const metadata: Metadata = {
     title: "TechRank — จัดอันดับอุปกรณ์ไอที",
     description: "ค้นหาและเปรียบเทียบอุปกรณ์ไอทีที่ดีที่สุด จัดอันดับอย่างเป็นกลาง รีวิวจากการใช้งานจริง",
   },
+  verification: {
+    google: "mMVOj4jmkOhSn44v-AnPCGM28H_1K350U2RwoZYNHjA",
+  },
 };
 
 import { Header } from "@/components/Header";
