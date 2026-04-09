@@ -1,6 +1,6 @@
-const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
+const cheerio = require('cheerio');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
 
@@ -8,6 +8,14 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
+
+const SHOPEE_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept-Language": "th-TH,th;q=0.9,en;q=0.8",
+  "Referer": "https://shopee.co.th/",
+  "Cache-Control": "no-cache",
+};
 
 const codeToSlug = {
   "19239567054": "sony-wh-1000xm5",
@@ -78,22 +86,24 @@ function parseCSVLine(line) {
   return row;
 }
 
-async function scrapeShopeeImage(page, shopeeUrl) {
+async function fetchShopeeImage(shopeeUrl) {
   try {
-    await page.goto(shopeeUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-    await new Promise(r => setTimeout(r, 2000));
+    const res = await fetch(shopeeUrl, { headers: SHOPEE_HEADERS });
+    if (!res.ok) return null;
+    const html = await res.text();
+    const $ = cheerio.load(html);
     
-    const imageUrl = await page.evaluate(() => {
-      // Priority 1: Meta Tag OG Image (usually the best quality available without hash manipulation)
-      const ogImg = document.querySelector('meta[property="og:image"]');
-      if (ogImg?.content && ogImg.content.includes('shopeemobile.com/file/')) return ogImg.content;
-      
-      // Priority 2: Main product image in carousel
-      const mainImg = document.querySelector('img.IZqgXY, img._1ier5r, div.product-image img');
-      if (mainImg?.src && mainImg.src.includes('shopee')) return mainImg.src;
-      
-      return null;
-    });
+    // Priority 1: OG Image Meta
+    let imageUrl = $('meta[property="og:image"]').attr('content');
+    
+    // Priority 2: Try to find hash in script tags if meta fails
+    if (!imageUrl || !imageUrl.includes('shopee')) {
+      const scriptText = $('script').text();
+      const match = scriptText.match(/"image":"([a-f0-9]{32})"/);
+      if (match) {
+        imageUrl = `https://cf.shopee.co.th/file/${match[1]}`;
+      }
+    }
     
     return imageUrl;
   } catch (e) {
@@ -102,7 +112,7 @@ async function scrapeShopeeImage(page, shopeeUrl) {
 }
 
 async function run() {
-  console.log("🕷️ Starting Direct Shopee Image Scraper...\n");
+  console.log("🕷️ Starting Fast Shopee Image Fetcher (No Puppeteer)...\n");
 
   const dataDir = 'D:\\MY_FIRST_WEB\\DATA';
   const downloadsDir = 'C:\\Users\\1-Click OC\\Downloads';
@@ -119,24 +129,20 @@ async function run() {
       const row = parseCSVLine(lines[i].trim());
       const code = row[0];
       const productUrl = row[7];
-      if (code && productUrl && productUrl.includes('shopee.co.th/product/')) {
+      if (code && productUrl && (productUrl.includes('shopee.co.th/product/') || productUrl.includes('shopee.co.th/'))) {
         shopeeUrlMap[code] = productUrl;
       }
     }
   }
 
-  const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
-  const page = await browser.newPage();
-  await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36');
-  await page.setViewport({ width: 1280, height: 800 });
-
   let updated = 0;
+  const slugs = Object.values(codeToSlug);
   for (const [code, slug] of Object.entries(codeToSlug)) {
     const shopeeUrl = shopeeUrlMap[code];
     if (!shopeeUrl) continue;
     
     process.stdout.write(`🔍 ${slug}... `);
-    const imageUrl = await scrapeShopeeImage(page, shopeeUrl);
+    const imageUrl = await fetchShopeeImage(shopeeUrl);
     
     if (imageUrl) {
       const { error } = await supabase
@@ -151,12 +157,11 @@ async function run() {
         console.log(`❌ DB error: ${error.message}`);
       }
     } else {
-      console.log(`❌ Scrape failed`);
+      console.log(`❌ Fetch failed`);
     }
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 2000)); // Be gentle
   }
   
-  await browser.close();
   console.log(`\n🎉 Done! ✅ Updated: ${updated} products with direct Shopee links`);
 }
 
