@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const cheerio = require('cheerio');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
 
@@ -11,10 +10,10 @@ const supabase = createClient(
 
 const SHOPEE_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+  "Accept": "application/json",
   "Accept-Language": "th-TH,th;q=0.9,en;q=0.8",
   "Referer": "https://shopee.co.th/",
-  "Cache-Control": "no-cache",
+  "X-Requested-With": "XMLHttpRequest",
 };
 
 const codeToSlug = {
@@ -73,46 +72,33 @@ const codeToSlug = {
   "51150841805": "edifier-comfo-q",
 };
 
-function parseCSVLine(line) {
-  const row = [];
-  let insideQuote = false;
-  let currentValue = '';
-  for (const char of line) {
-    if (char === '"') insideQuote = !insideQuote;
-    else if (char === ',' && !insideQuote) { row.push(currentValue); currentValue = ''; }
-    else currentValue += char;
-  }
-  row.push(currentValue);
-  return row;
+function extractShopeeIds(url) {
+  const match1 = url.match(/i\.(\d+)\.(\d+)/);
+  if (match1) return { shopId: match1[1], itemId: match1[2] };
+  const match2 = url.match(/\/product\/(\d+)\/(\d+)/);
+  if (match2) return { shopId: match2[1], itemId: match2[2] };
+  return null;
 }
 
-async function fetchShopeeImage(shopeeUrl) {
+async function getShopeeImageApi(shopeeUrl) {
+  const ids = extractShopeeIds(shopeeUrl);
+  if (!ids) return null;
+  
+  const apiUrl = `https://shopee.co.th/api/v4/item/get?shopid=${ids.shopId}&itemid=${ids.itemId}`;
   try {
-    const res = await fetch(shopeeUrl, { headers: SHOPEE_HEADERS });
+    const res = await fetch(apiUrl, { headers: SHOPEE_HEADERS });
     if (!res.ok) return null;
-    const html = await res.text();
-    const $ = cheerio.load(html);
-    
-    // Priority 1: OG Image Meta
-    let imageUrl = $('meta[property="og:image"]').attr('content');
-    
-    // Priority 2: Try to find hash in script tags if meta fails
-    if (!imageUrl || !imageUrl.includes('shopee')) {
-      const scriptText = $('script').text();
-      const match = scriptText.match(/"image":"([a-f0-9]{32})"/);
-      if (match) {
-        imageUrl = `https://cf.shopee.co.th/file/${match[1]}`;
-      }
-    }
-    
-    return imageUrl;
+    const json = await res.json();
+    const hash = json?.data?.image;
+    if (hash) return `https://cf.shopee.co.th/file/${hash}`;
+    return null;
   } catch (e) {
     return null;
   }
 }
 
 async function run() {
-  console.log("🕷️ Starting Fast Shopee Image Fetcher (No Puppeteer)...\n");
+  console.log("🚀 Starting API-based Shopee Image Enrichment...\n");
 
   const dataDir = 'D:\\MY_FIRST_WEB\\DATA';
   const downloadsDir = 'C:\\Users\\1-Click OC\\Downloads';
@@ -123,46 +109,37 @@ async function run() {
   
   const shopeeUrlMap = {};
   for (const file of allFiles) {
-    if (!fs.existsSync(file)) continue;
-    const lines = fs.readFileSync(file, 'utf8').trim().split('\n');
+    const content = fs.readFileSync(file, 'utf8');
+    const lines = content.trim().split('\n');
     for (let i = 1; i < lines.length; i++) {
-      const row = parseCSVLine(lines[i].trim());
-      const code = row[0];
-      const productUrl = row[7];
-      if (code && productUrl && (productUrl.includes('shopee.co.th/product/') || productUrl.includes('shopee.co.th/'))) {
-        shopeeUrlMap[code] = productUrl;
-      }
+        const row = lines[i].split(',');
+        if (row[0] && row[7]) shopeeUrlMap[row[0].trim()] = row[7].trim();
     }
   }
 
   let updated = 0;
-  const slugs = Object.values(codeToSlug);
   for (const [code, slug] of Object.entries(codeToSlug)) {
-    const shopeeUrl = shopeeUrlMap[code];
-    if (!shopeeUrl) continue;
-    
-    process.stdout.write(`🔍 ${slug}... `);
-    const imageUrl = await fetchShopeeImage(shopeeUrl);
+    const url = shopeeUrlMap[code];
+    if (!url) continue;
+
+    process.stdout.write(`📸 ${slug}... `);
+    const imageUrl = await getShopeeImageApi(url);
     
     if (imageUrl) {
-      const { error } = await supabase
-        .from('products')
-        .update({ image_url: imageUrl })
-        .eq('slug', slug);
-      
+      const { error } = await supabase.from('products').update({ image_url: imageUrl }).eq('slug', slug);
       if (!error) {
-        console.log(`✅ ${imageUrl.substring(0, 40)}...`);
+        console.log(`✅ ${imageUrl}`);
         updated++;
       } else {
-        console.log(`❌ DB error: ${error.message}`);
+        console.log(`❌ DB Error: ${error.message}`);
       }
     } else {
-      console.log(`❌ Fetch failed`);
+      console.log(`❌ API Failed`);
     }
-    await new Promise(r => setTimeout(r, 2000)); // Be gentle
+    await new Promise(r => setTimeout(r, 1000));
   }
   
-  console.log(`\n🎉 Done! ✅ Updated: ${updated} products with direct Shopee links`);
+  console.log(`\n🎉 Success! Updated ${updated} products with direct Shopee images.`);
 }
 
-run().catch(console.error);
+run();
