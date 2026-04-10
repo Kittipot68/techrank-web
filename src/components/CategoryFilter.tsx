@@ -74,12 +74,11 @@ export function CategoryFilter({ products, totalItems, currentPage }: CategoryFi
                             className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                     </div>
-                        <div className="flex items-center gap-1.5 opacity-60">
-                            {isPending && <div className="h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
-                            <p className="text-sm text-slate-500 dark:text-slate-400 shrink-0">
-                                {totalItems} สินค้า
-                            </p>
-                        </div>
+                    <div className="flex items-center gap-1.5 opacity-60">
+                        {isPending && <div className="h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
+                        <p className="text-sm text-slate-500 dark:text-slate-400 shrink-0">
+                            {totalItems} สินค้า
+                        </p>
                     </div>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
