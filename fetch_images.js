@@ -104,21 +104,14 @@ async function fetchShopeeProductData(shopId, itemId) {
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
+        'Accept': 'application/json, text/plain, */*',
         'Accept-Language': 'th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7',
         'Referer': 'https://shopee.co.th/',
-        'Origin': 'https://shopee.co.th',
         'X-API-Source': 'pc',
         'X-Shopee-Language': 'th',
         'X-Requested-With': 'XMLHttpRequest',
-        'Sec-Ch-Ua': '\"Not;A=Brand\";v=\"99\", \"Google Chrome\";v=\"128\", \"Chromium\";v=\"128\"',
-        'Sec-Ch-Ua-Mobile': '?0',
-        'Sec-Ch-Ua-Platform': '\"Windows\"',
-        'Sec-Fetch-Dest': 'empty',
-        'Sec-Fetch-Mode': 'cors',
-        'Sec-Fetch-Site': 'same-origin',
-        'Cookie': 'SPC_IA=-1; SPC_EC=-; SPC_F=GUR7Y5Xq3Z0rI2U9X0Z0Z0Z0Z0Z0Z0Z0; REC_T_ID=0;',
+        'Cookie': 'SPC_F=uzevua7tqQi0XampSg5cqZ1EgRH789KF; SPC_CLIENTID=dXpldnVhN3RxUWkwsbfaijopcmcbooxk; SPC_U=42892265; csrftoken=npPRPmvMfQs2Nhhl3OSDn7Ak4xQUUiUv;',
       }
     });
 
