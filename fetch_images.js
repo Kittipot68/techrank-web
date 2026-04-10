@@ -100,79 +100,97 @@ function delay(ms) {
 // ── Shopee API: ดึงข้อมูลครบ (รูป + specs + description) ──────
 
 async function fetchShopeeProductData(shopId, itemId) {
-  const url = `https://shopee.co.th/api/v4/item/get?itemid=${itemId}&shopid=${shopId}`;
+  const url = `https://shopee.co.th/product/${shopId}/${itemId}`;
   try {
     const res = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Referer': 'https://shopee.co.th/',
-        'X-API-Source': 'pc',
-        'X-Shopee-Language': 'th',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Cookie': 'SPC_F=uzevua7tqQi0XampSg5cqZ1EgRH789KF; SPC_CLIENTID=dXpldnVhN3RxUWkwsbfaijopcmcbooxk; SPC_U=42892265; csrftoken=npPRPmvMfQs2Nhhl3OSDn7Ak4xQUUiUv;',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Upgrade-Insecure-Requests': '1',
       }
     });
 
     if (!res.ok) {
-      if (res.status === 403) console.error(`   🛑 403 Forbidden (Blocked by Shopee)`);
-      else if (res.status === 429) console.error(`   🛑 429 Too Many Requests`);
-      else console.error(`   🛑 HTTP Error: ${res.status}`);
+      console.error(`   🛑 HTML Error: ${res.status}`);
       return null;
     }
-    const json = await res.json();
-    const d = json?.data;
-    if (!d) return null;
+
+    const html = await res.text();
+    
+    // 🕵️ EXTRACTION LOOPHOLE: Look for the SSR data script
+    const scriptStart = '<script id="main" type="text/mfe-initial-data">';
+    const startIdx = html.indexOf(scriptStart);
+    if (startIdx === -1) {
+      // Try fallback script tag if Shopee changed the ID
+      const fallbackStart = '<script type="text/mfe-initial-data">';
+      const fIdx = html.indexOf(fallbackStart);
+      if (fIdx === -1) {
+        console.error('   ❌ Could not find data script in HTML');
+        return null;
+      }
+    }
+
+    const jsonStringMatch = html.match(/<script [^>]*type="text\/mfe-initial-data"[^>]*>(.*?)<\/script>/s);
+    if (!jsonStringMatch) return null;
+
+    const fullState = JSON.parse(jsonStringMatch[1]);
+    const itemData = fullState?.initialState?.DOMAIN_PDP?.data?.PDP_BFF_DATA?.cachedMap[`${shopId}/${itemId}`]?.item 
+                   || fullState?.initialState?.item; // Fallback paths
+
+    if (!itemData) {
+      console.error('   ❌ Item data not found in state object');
+      return null;
+    }
+
+    const d = itemData;
 
     // ── รูปภาพทั้งหมด ──
     const imageHashes = d.images || (d.image ? [d.image] : []);
     const allImageUrls = imageHashes
       .filter(Boolean)
       .map(h => `https://down-th.img.susercontent.com/file/${h}`);
-    const imageUrl = allImageUrls[0] || null; // รูปแรก = รูปหลัก
+    const imageUrl = allImageUrls[0] || null;
 
     // ── ราคา ──
-    const priceMin = d.price_min ? d.price_min / 100000 : null;
-    const priceMax = d.price_max ? d.price_max / 100000 : null;
+    // In SSR state, price might be in direct currency or raw units
+    let priceMin = d.price_min || d.price;
+    if (priceMin > 100000) priceMin = priceMin / 100000;
+    
+    let priceMax = d.price_max || d.price;
+    if (priceMax > 100000) priceMax = priceMax / 100000;
 
     // ── คำอธิบาย ──
-    const description = d.description || null;
+    const description = d.description || d.rich_text_description?.text || null;
 
     // ── Brand ──
     const brand = d.brand || null;
 
-    // ── Attributes (Specs) จาก Shopee ──
+    // ── Attributes (Specs) ──
     const rawAttributes = d.attributes || [];
     const specs = rawAttributes
       .filter(a => a.name && a.value)
       .map(a => ({ key: a.name, value: a.value }));
 
-    // ── Tier Variations (สี, ขนาด ฯลฯ) ──
-    const tierVariations = (d.tier_variations || [])
-      .filter(t => t.name && t.options?.length > 0)
-      .map(t => ({ key: t.name, value: t.options.join(' / ') }));
-
-    const allSpecs = [...specs, ...tierVariations];
-
     // ── ยอดขาย + Rating ──
     const itemSold = d.historical_sold || d.sold || 0;
-    const itemRating = d.item_rating?.rating_star ? (d.item_rating.rating_star / 1).toFixed(1) : null;
-    const ratingCount = d.item_rating?.rating_count?.[0] || 0;
+    const itemRating = d.item_rating?.rating_star || null;
 
     return {
       imageUrl,
-      allImageUrls,           // ← รูปทั้งหมด (max ~9 รูปจาก Shopee)
+      allImageUrls,
       priceMin,
       priceMax,
       description,
       brand,
-      specs: allSpecs,
+      specs,
       itemSold,
-      itemRating: itemRating ? parseFloat(itemRating) : null,
-      ratingCount,
+      itemRating: itemRating ? parseFloat(itemRating.toFixed(1)) : null,
     };
   } catch (e) {
+    console.error(`   ❌ Scraping error: ${e.message}`);
     return null;
   }
 }
