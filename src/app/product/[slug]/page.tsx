@@ -10,7 +10,7 @@ import { StarRating } from "@/components/StarRating";
 import { ShareButtons } from "@/components/ShareButtons";
 import { WishlistButton } from "@/components/WishlistButton";
 import { ViewCounter } from "@/components/ViewCounter";
-import { ProductImageGallery } from "@/components/ProductImageGallery";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 
 interface ProductPageProps {
     params: Promise<{
@@ -105,15 +105,12 @@ export default async function ProductPage({ params }: ProductPageProps) {
                 dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
             />
             {/* Breadcrumb ... */}
-            <nav className="mb-8 flex flex-wrap text-sm text-slate-500 dark:text-slate-400">
-                <Link href="/" className="hover:text-blue-600 dark:hover:text-blue-400">Home</Link>
-                <span className="mx-2">/</span>
-                <Link href={`/category/${product.categories?.slug}`} className="hover:text-blue-600 dark:hover:text-blue-400 capitalize">
-                    {product.categories?.name}
-                </Link>
-                <span className="mx-2">/</span>
-                <span className="text-slate-900 dark:text-slate-100 font-medium truncate">{product.name}</span>
-            </nav>
+            <Breadcrumbs 
+                items={[
+                    { label: product.categories?.name || "Category", href: `/category/${product.categories?.slug}` },
+                    { label: product.name }
+                ]} 
+            />
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
                 {/* Left Column: Image Gallery & Affiliate */}

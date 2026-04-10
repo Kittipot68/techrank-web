@@ -50,10 +50,10 @@ export function Header({ categories = [] }: HeaderProps) {
                     </Link>
 
                     {/* Desktop Nav */}
-                    <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
+                    <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
                         {/* Dynamic Category Dropdown */}
                         <div 
-                            className="relative group"
+                            className="relative group h-16 flex items-center"
                             onMouseEnter={() => {
                                 if (catTimeoutRef.current) clearTimeout(catTimeoutRef.current);
                                 setCatOpen(true);
@@ -72,23 +72,24 @@ export function Header({ categories = [] }: HeaderProps) {
                             </button>
 
                             {catOpen && (
-                                <div className="absolute top-full left-0 w-64 mt-2 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl animate-in fade-in zoom-in-95 duration-200">
-                                    <div className="max-h-[70vh] overflow-y-auto px-1 custom-scrollbar">
-                                        <div className="grid grid-cols-1 gap-1">
+                                <div className="absolute top-full left-0 w-[480px] mt-0 py-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-b-2xl shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="px-6">
+                                        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">เลือกดูตามหมวดหมู่</div>
+                                        <div className="grid grid-cols-2 gap-x-8 gap-y-2">
                                             {displayCategories.length > 0 ? (
                                                 displayCategories.map((cat) => (
                                                     <Link
                                                         key={cat.id}
                                                         href={`/category/${cat.slug}`}
-                                                        className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all font-normal text-[13px]"
+                                                        className="flex items-center justify-between group/item py-1 text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
                                                         onClick={() => setCatOpen(false)}
                                                     >
-                                                        {cat.name}
-                                                        <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+                                                        <span className="text-[13.5px] font-medium">{cat.name}</span>
+                                                        <ChevronRight className="h-3 w-3 opacity-0 -translate-x-2 group-hover/item:opacity-100 group-hover/item:translate-x-0 transition-all text-blue-500" />
                                                     </Link>
                                                 ))
                                             ) : (
-                                                <div className="px-3 py-2 text-xs text-slate-400 italic text-center">ยังไม่มีหมวดหมู่</div>
+                                                <div className="col-span-2 text-sm text-slate-400 italic">ยังไม่มีหมวดหมู่</div>
                                             )}
                                         </div>
                                     </div>
@@ -96,14 +97,30 @@ export function Header({ categories = [] }: HeaderProps) {
                             )}
                         </div>
 
-                        <Link href="/compare" className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                        <Link href="/compare" className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors whitespace-nowrap">
                             เปรียบเทียบ
                         </Link>
                     </nav>
 
+                    {/* Desktop Search Bar (Persistent) */}
+                    <div className="hidden md:flex flex-1 max-w-md mx-8">
+                        <div 
+                            className="relative w-full group cursor-pointer"
+                            onClick={() => setSearchOpen(true)}
+                        >
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-hover:text-blue-500 transition-colors" />
+                            <div className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border border-transparent group-hover:border-blue-500/30 rounded-full text-sm text-slate-500 dark:text-slate-400 transition-all flex items-center justify-between">
+                                <span>ค้นหาสินค้า หรือหมวดหมู่...</span>
+                                <kbd className="hidden sm:inline-flex h-5 select-none items-center gap-1 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-1.5 font-mono text-[10px] font-medium text-slate-400 opacity-100">
+                                    <span className="text-xs">⌘</span>K
+                                </kbd>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Actions */}
                     <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" aria-label="Search" onClick={() => setSearchOpen(true)}>
+                        <Button variant="ghost" size="icon" aria-label="Search" className="md:hidden" onClick={() => setSearchOpen(true)}>
                             <Search className="h-5 w-5" />
                         </Button>
 
