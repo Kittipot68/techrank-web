@@ -11,6 +11,7 @@ import { ShareButtons } from "@/components/ShareButtons";
 import { WishlistButton } from "@/components/WishlistButton";
 import { ViewCounter } from "@/components/ViewCounter";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { ProductImageGallery } from "@/components/ProductImageGallery";
 
 interface ProductPageProps {
     params: Promise<{
