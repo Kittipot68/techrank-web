@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Trophy, Zap, Bot } from "lucide-react";
+import { ArrowRight, Trophy, Zap, Bot, Layers, Sparkles, Smartphone, Headphones, Speaker, Cpu } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ProductCard } from "@/components/ProductCard";
 import { FeaturedSlider } from "@/components/FeaturedSlider";
@@ -68,30 +68,57 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Categories */}
+      {/* Categories Grid */}
       <section className="container mx-auto px-4">
-        <h2 className="text-2xl font-bold mb-6 md:mb-8 text-slate-900 dark:text-white">หมวดหมู่แนะนำ</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-          <Link href="/category/headphones" className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 p-6 md:p-8 text-white transition-transform hover:scale-[1.01]">
-            <div className="relative z-10">
-              <h3 className="text-xl md:text-2xl font-bold">หูฟัง (Headphones)</h3>
-              <p className="mt-2 text-indigo-100 text-sm md:text-base">แบบครอบหู, อินเอียร์ และตัดเสียงรบกวน</p>
-              <div className="mt-3 md:mt-4 inline-flex items-center text-sm font-semibold">
-                ดูอันดับ <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </div>
-            </div>
-            <Trophy className="absolute right-4 bottom-4 h-24 w-24 md:h-32 md:w-32 text-white/10 rotate-12" />
-          </Link>
-          <Link href="/category/gaming-gear" className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 p-6 md:p-8 text-white transition-transform hover:scale-[1.01]">
-            <div className="relative z-10">
-              <h3 className="text-xl md:text-2xl font-bold">อุปกรณ์เกมมิ่ง</h3>
-              <p className="mt-2 text-blue-100 text-sm md:text-base">เมาส์, คีย์บอร์ด และจอเกมมิ่ง</p>
-              <div className="mt-3 md:mt-4 inline-flex items-center text-sm font-semibold">
-                ดูอันดับ <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-              </div>
-            </div>
-            <Zap className="absolute right-4 bottom-4 h-24 w-24 md:h-32 md:w-32 text-white/10 rotate-12" />
-          </Link>
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">สำรวจหมวดหมู่</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">เลือกหมวดหมู่ที่สนใจเพื่อดูการจัดอันดับที่ดีที่สุด</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {categories.map((cat, idx) => {
+            // Premium gradients and icons for specific categories or based on index
+            const variants = [
+              { bg: "from-indigo-600 to-purple-600", icon: <Headphones className="h-12 w-12" /> },
+              { bg: "from-blue-600 to-cyan-500", icon: <Cpu className="h-12 w-12" /> },
+              { bg: "from-emerald-500 to-teal-600", icon: <Speaker className="h-12 w-12" /> },
+              { bg: "from-orange-500 to-amber-600", icon: <Smartphone className="h-12 w-12" /> },
+              { bg: "from-rose-500 to-pink-600", icon: <Layers className="h-12 w-12" /> },
+              { bg: "from-slate-700 to-slate-900", icon: <Sparkles className="h-12 w-12" /> },
+            ];
+            
+            const variant = variants[idx % variants.length];
+            const isHeadphones = cat.slug === "headphones";
+            const isGaming = cat.slug === "gaming-gear";
+            
+            // Override icons if specific slug matches
+            let icon = variant.icon;
+            if (isHeadphones) icon = <Headphones className="h-12 w-12" />;
+            if (isGaming) icon = <Zap className="h-12 w-12" />;
+
+            return (
+              <Link 
+                key={cat.id} 
+                href={`/category/${cat.slug}`} 
+                className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${variant.bg} p-6 text-white transition-all duration-300 hover:scale-[1.02] hover:shadow-xl hover:shadow-slate-200 dark:hover:shadow-none`}
+              >
+                <div className="relative z-10 flex flex-col h-full justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold group-hover:underline decoration-white/30 underline-offset-4">{cat.name}</h3>
+                    <p className="mt-1 text-white/80 text-xs line-clamp-1">อันดับสินค้า {cat.name} ล่าสุด</p>
+                  </div>
+                  <div className="mt-4 flex items-center text-xs font-semibold bg-white/10 w-fit px-3 py-1.5 rounded-full backdrop-blur-sm group-hover:bg-white/20 transition-colors">
+                    ดูอันดับ <ArrowRight className="ml-1.5 h-3 w-3 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </div>
+                <div className="absolute -right-2 -bottom-2 opacity-10 rotate-12 transition-transform group-hover:scale-110 group-hover:rotate-0 duration-500">
+                  {icon}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
 

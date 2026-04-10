@@ -1,27 +1,26 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Bot, Menu, Search, X, ChevronRight, Heart } from "lucide-react";
+import { Bot, Menu, Search, X, ChevronRight, Heart, ChevronDown, Layers } from "lucide-react";
 import { Button } from "./ui/Button";
 import { SearchModal } from "./SearchModal";
 import { ThemeToggle } from "./ThemeToggle";
+import { Category } from "@/lib/queries";
 
-const NAV_CATEGORIES = [
-    { name: "Headphones", href: "/category/headphones" },
-    { name: "Gaming Gear", href: "/category/gaming-gear" },
-    { name: "Keyboards", href: "/category/keyboards" },
-    { name: "Mice", href: "/category/mice" },
-    { name: "Monitors", href: "/category/monitors" },
-    { name: "Earbuds", href: "/category/earbuds" },
-    { name: "Laptops", href: "/category/laptops" },
-    { name: "Smartphones", href: "/category/smartphones" },
-];
+interface HeaderProps {
+    categories?: Category[];
+}
 
-export function Header() {
+export function Header({ categories = [] }: HeaderProps) {
     const [mobileOpen, setMobileOpen] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
     const [wishlistCount, setWishlistCount] = useState(0);
+    const [catOpen, setCatOpen] = useState(false);
+    const catTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Filter categories that actually have names
+    const displayCategories = categories.filter(c => c.name).sort((a, b) => a.name.localeCompare(b.name));
 
     // Load and listen for wishlist changes
     useEffect(() => {
@@ -52,9 +51,54 @@ export function Header() {
 
                     {/* Desktop Nav */}
                     <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-300">
-                        <Link href="/category/headphones" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">หูฟัง</Link>
-                        <Link href="/category/gaming-gear" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">อุปกรณ์เกมมิ่ง</Link>
-                        <Link href="/compare" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">เปรียบเทียบ</Link>
+                        {/* Dynamic Category Dropdown */}
+                        <div 
+                            className="relative group"
+                            onMouseEnter={() => {
+                                if (catTimeoutRef.current) clearTimeout(catTimeoutRef.current);
+                                setCatOpen(true);
+                            }}
+                            onMouseLeave={() => {
+                                catTimeoutRef.current = setTimeout(() => setCatOpen(false), 200);
+                            }}
+                        >
+                            <button 
+                                className={`flex items-center gap-1 py-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors ${catOpen ? "text-blue-600 dark:text-blue-400" : ""}`}
+                                onClick={() => setCatOpen(!catOpen)}
+                            >
+                                <Layers className="h-4 w-4" />
+                                หมวดหมู่
+                                <ChevronDown className={`h-3 w-3 transition-transform ${catOpen ? "rotate-180" : ""}`} />
+                            </button>
+
+                            {catOpen && (
+                                <div className="absolute top-full left-0 w-64 mt-2 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="max-h-[70vh] overflow-y-auto px-1 custom-scrollbar">
+                                        <div className="grid grid-cols-1 gap-1">
+                                            {displayCategories.length > 0 ? (
+                                                displayCategories.map((cat) => (
+                                                    <Link
+                                                        key={cat.id}
+                                                        href={`/category/${cat.slug}`}
+                                                        className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-all font-normal text-[13px]"
+                                                        onClick={() => setCatOpen(false)}
+                                                    >
+                                                        {cat.name}
+                                                        <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+                                                    </Link>
+                                                ))
+                                            ) : (
+                                                <div className="px-3 py-2 text-xs text-slate-400 italic text-center">ยังไม่มีหมวดหมู่</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <Link href="/compare" className="flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                            เปรียบเทียบ
+                        </Link>
                     </nav>
 
                     {/* Actions */}
@@ -92,18 +136,25 @@ export function Header() {
                 {/* Mobile Nav */}
                 {mobileOpen && (
                     <div className="md:hidden border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 animate-in slide-in-from-top-2 duration-200">
-                        <nav className="container mx-auto px-4 py-4 space-y-1">
-                            {NAV_CATEGORIES.map((cat) => (
-                                <Link
-                                    key={cat.href}
-                                    href={cat.href}
-                                    onClick={() => setMobileOpen(false)}
-                                    className="flex items-center justify-between py-3 px-3 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                >
-                                    {cat.name}
-                                    <ChevronRight className="h-4 w-4 text-slate-400" />
-                                </Link>
-                            ))}
+                        <nav className="container mx-auto px-4 py-4 space-y-1 max-h-[80vh] overflow-y-auto">
+                            <div className="text-[11px] font-bold text-slate-400 dark:text-slate-500 px-3 py-1 uppercase tracking-wider">
+                                หมวดหมู่สินค้า
+                            </div>
+                            {displayCategories.length > 0 ? (
+                                displayCategories.map((cat) => (
+                                    <Link
+                                        key={cat.id}
+                                        href={`/category/${cat.slug}`}
+                                        onClick={() => setMobileOpen(false)}
+                                        className="flex items-center justify-between py-3 px-3 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        {cat.name}
+                                        <ChevronRight className="h-4 w-4 text-slate-400" />
+                                    </Link>
+                                ))
+                            ) : (
+                                <div className="px-3 py-2 text-xs text-slate-400 italic">ยังไม่มีหมวดหมู่</div>
+                            )}
                             <div className="pt-3 border-t border-slate-100 dark:border-slate-700 mt-2 space-y-1">
                                 <Link
                                     href="/compare"
