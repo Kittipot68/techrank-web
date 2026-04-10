@@ -104,18 +104,43 @@ export async function getTopProducts(limit = 3): Promise<ProductWithCategory[]> 
     return (data as any) || [];
 }
 
-export async function getProductsByCategory(categoryId: string): Promise<ProductWithCategory[]> {
-    const { data, error } = await supabase
+export async function getProductsByCategory(
+    categoryId: string, 
+    page = 1, 
+    limit = 12,
+    sort: string = 'score-desc',
+    priceMin?: number,
+    priceMax?: number
+): Promise<{ products: ProductWithCategory[], total: number }> {
+    const start = (page - 1) * limit;
+    const end = start + limit - 1;
+
+    let query = supabase
         .from("products")
-        .select("*, categories(*)")
-        .eq("category_id", categoryId)
-        .order("overall_score", { ascending: false, nullsFirst: false });
+        .select("*, categories(*)", { count: 'exact' })
+        .eq("category_id", categoryId);
+
+    // Filter by Price
+    if (priceMin !== undefined) query = query.gte('price_min', priceMin);
+    if (priceMax !== undefined) query = query.lte('price_min', priceMax);
+
+    // Sorting
+    switch (sort) {
+        case "score-desc": query = query.order("overall_score", { ascending: false, nullsFirst: false }); break;
+        case "score-asc": query = query.order("overall_score", { ascending: true, nullsFirst: false }); break;
+        case "price-asc": query = query.order("price_min", { ascending: true, nullsFirst: false }); break;
+        case "price-desc": query = query.order("price_min", { ascending: false, nullsFirst: false }); break;
+        case "name-asc": query = query.order("name", { ascending: true }); break;
+        default: query = query.order("overall_score", { ascending: false, nullsFirst: false });
+    }
+
+    const { data, error, count } = await query.range(start, end);
 
     if (error) {
         console.error("Error fetching products by category:", error);
-        return [];
+        return { products: [], total: 0 };
     }
-    return (data as any) || [];
+    return { products: (data as any) || [], total: count || 0 };
 }
 
 export async function getProductBySlug(slug: string): Promise<ProductWithCategory | null> {

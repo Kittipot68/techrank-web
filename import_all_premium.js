@@ -448,63 +448,65 @@ async function run() {
 
   console.log(`Loaded ${Object.keys(affiliateMap).length} affiliate links from CSVs\n`);
 
+  // 3. Batch process product insertions/updates
+  const productsToProcess = Object.entries(productDB);
+  console.log(`🚀 Processing ${productsToProcess.length} products in batches of 50...`);
+  
+  const BATCH_SIZE = 50;
   let insertedCount = 0;
   let skippedCount = 0;
 
-  for (const [code, info] of Object.entries(productDB)) {
-    if (!affiliateMap[code]) {
-      console.log(`⚠️  No affiliate link for ${info.name} (code: ${code}) — skipping`);
-      skippedCount++;
-      continue;
-    }
+  for (let i = 0; i < productsToProcess.length; i += BATCH_SIZE) {
+    const batch = productsToProcess.slice(i, i + BATCH_SIZE);
+    
+    await Promise.all(batch.map(async ([code, info]) => {
+      if (!affiliateMap[code]) {
+        skippedCount++;
+        return;
+      }
 
-    const catId = getCatId(info.cat);
-    if (!catId) {
-      console.log(`⚠️  Category '${info.cat}' not found for ${info.name}`);
-      skippedCount++;
-      continue;
-    }
+      const catId = getCatId(info.cat);
+      if (!catId) {
+        skippedCount++;
+        return;
+      }
 
-    // Find price from the CSV (read again or use a stored price)
-    // We'll add it from a separate pass if needed — for now set from what we read
-    const productId = crypto.randomUUID();
+      const productId = crypto.randomUUID();
+      const productData = {
+        id: productId,
+        category_id: catId,
+        name: info.name,
+        slug: info.slug,
+        price_min: info.price || null,
+        price_max: info.price || null,
+        overall_score: info.score,
+        sound_score: info.sound || null,
+        fps_score: info.fps > 0 ? info.fps : null,
+        comfort_score: info.comfort || null,
+        build_score: info.build || null,
+        description: info.desc,
+        pros: info.pros,
+        cons: info.cons,
+        affiliate_url: affiliateMap[code],
+        view_count: Math.floor(Math.random() * 900) + 100
+      };
 
-    const { error } = await supabase.from('products').insert({
-      id: productId,
-      category_id: catId,
-      name: info.name,
-      slug: info.slug,
-      price_min: info.price || null,
-      price_max: info.price || null,
-      overall_score: info.score,
-      sound_score: info.sound || null,
-      fps_score: info.fps > 0 ? info.fps : null,
-      comfort_score: info.comfort || null,
-      build_score: info.build || null,
-      description: info.desc,
-      pros: info.pros,
-      cons: info.cons,
-      affiliate_url: affiliateMap[code],
-      view_count: Math.floor(Math.random() * 900) + 100
-    });
+      const { error } = await supabase.from('products').insert(productData);
 
-    if (error) {
-      if (error.message.includes('duplicate key')) {
-        console.log(`⏭️  Already exists: ${info.name}`);
+      if (error) {
+        skippedCount++;
       } else {
-        console.error(`❌ Error: ${info.name}: ${error.message}`);
+        insertedCount++;
+        // Insert specs
+        if (info.specs?.length) {
+          await supabase.from('specs').insert(
+            info.specs.map(s => ({ product_id: productId, key: s.key, value: s.value }))
+          );
+        }
       }
-      skippedCount++;
-    } else {
-      console.log(`✅ Inserted: ${info.name}`);
-      insertedCount++;
-      // Insert specs
-      if (info.specs?.length) {
-        await supabase.from('specs').insert(
-          info.specs.map(s => ({ product_id: productId, key: s.key, value: s.value }))
-        );
-      }
-    }
+    }));
+    
+    console.log(`📦 Processed batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(productsToProcess.length / BATCH_SIZE)}`);
   }
 
   console.log(`\n🎉 Done! Inserted: ${insertedCount} | Skipped/Existing: ${skippedCount}`);

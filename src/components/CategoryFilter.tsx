@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useTransition } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { ArrowUpDown, SlidersHorizontal, Search } from "lucide-react";
 import { ProductCard } from "./ProductCard";
 import { Pagination } from "./Pagination";
@@ -9,68 +10,53 @@ type SortOption = "score-desc" | "score-asc" | "price-asc" | "price-desc" | "nam
 
 interface CategoryFilterProps {
     products: any[];
+    totalItems: number;
+    currentPage: number;
 }
 
 const ITEMS_PER_PAGE = 12;
 
-export function CategoryFilter({ products }: CategoryFilterProps) {
-    const [sort, setSort] = useState<SortOption>("score-desc");
-    const [priceMin, setPriceMin] = useState("");
-    const [priceMax, setPriceMax] = useState("");
-    const [searchQuery, setSearchQuery] = useState("");
+export function CategoryFilter({ products, totalItems, currentPage }: CategoryFilterProps) {
+    const router = useRouter();
+    const pathname = usePathname();
+    const searchParams = useSearchParams();
+    const [isPending, startTransition] = useTransition();
+
     const [showFilters, setShowFilters] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
 
-    const filteredAndSorted = useMemo(() => {
-        let result = [...products];
+    // Get current values from URL
+    const sort = (searchParams.get("sort") as SortOption) || "score-desc";
+    const priceMin = searchParams.get("min") || "";
+    const priceMax = searchParams.get("max") || "";
+    const searchQuery = searchParams.get("q") || "";
 
-        // Search filter
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase();
-            result = result.filter(p => p.name.toLowerCase().includes(q));
-        }
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 
-        // Price filter
-        if (priceMin) {
-            result = result.filter((p) => (p.price_min || 0) >= Number(priceMin));
-        }
-        if (priceMax) {
-            result = result.filter((p) => (p.price_min || Infinity) <= Number(priceMax));
-        }
+    const updateQuery = (params: Record<string, string | null>) => {
+        const newParams = new URLSearchParams(searchParams.toString());
+        Object.entries(params).forEach(([key, value]) => {
+            if (value === null || value === "") {
+                newParams.delete(key);
+            } else {
+                newParams.set(key, value);
+            }
+        });
+        // Always reset to page 1 when filters/sort change
+        if (!params.page) newParams.delete("page");
+        
+        startTransition(() => {
+            router.push(`${pathname}?${newParams.toString()}`, { scroll: false });
+        });
+    };
 
-        // Sort
-        switch (sort) {
-            case "score-desc":
-                result.sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0));
-                break;
-            case "score-asc":
-                result.sort((a, b) => (a.overall_score || 0) - (b.overall_score || 0));
-                break;
-            case "price-asc":
-                result.sort((a, b) => (a.price_min || 0) - (b.price_min || 0));
-                break;
-            case "price-desc":
-                result.sort((a, b) => (b.price_min || 0) - (a.price_min || 0));
-                break;
-            case "name-asc":
-                result.sort((a, b) => a.name.localeCompare(b.name));
-                break;
-        }
-
-        return result;
-    }, [products, sort, priceMin, priceMax, searchQuery]);
-
-    // Pagination
-    const totalPages = Math.ceil(filteredAndSorted.length / ITEMS_PER_PAGE);
-    const paginatedProducts = useMemo(() => {
-        const start = (currentPage - 1) * ITEMS_PER_PAGE;
-        return filteredAndSorted.slice(start, start + ITEMS_PER_PAGE);
-    }, [filteredAndSorted, currentPage]);
-
-    // Reset page when filters change
-    const handleSearchChange = (q: string) => { setSearchQuery(q); setCurrentPage(1); };
-    const handleSortChange = (s: SortOption) => { setSort(s); setCurrentPage(1); };
-    const handleClearFilters = () => { setPriceMin(""); setPriceMax(""); setSearchQuery(""); setCurrentPage(1); };
+    const handleSearchChange = (q: string) => updateQuery({ q });
+    const handleSortChange = (s: SortOption) => updateQuery({ sort: s });
+    const handlePriceChange = (min: string, max: string) => updateQuery({ min, max });
+    const handlePageChange = (p: number) => updateQuery({ page: p.toString() });
+    const handleClearFilters = () => {
+        const newParams = new URLSearchParams();
+        router.push(pathname, { scroll: false });
+    };
 
     return (
         <div>
@@ -88,9 +74,13 @@ export function CategoryFilter({ products }: CategoryFilterProps) {
                             className="w-full pl-9 pr-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                     </div>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 shrink-0 hidden sm:block">
-                        {filteredAndSorted.length} สินค้า
-                    </p>
+                        <div className="flex items-center gap-1.5 opacity-60">
+                            {isPending && <div className="h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />}
+                            <p className="text-sm text-slate-500 dark:text-slate-400 shrink-0">
+                                {totalItems} สินค้า
+                            </p>
+                        </div>
+                    </div>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
                     <button
@@ -129,7 +119,7 @@ export function CategoryFilter({ products }: CategoryFilterProps) {
                             <input
                                 type="number"
                                 value={priceMin}
-                                onChange={(e) => { setPriceMin(e.target.value); setCurrentPage(1); }}
+                                onChange={(e) => handlePriceChange(e.target.value, priceMax)}
                                 placeholder="0"
                                 className="w-32 px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
@@ -139,7 +129,7 @@ export function CategoryFilter({ products }: CategoryFilterProps) {
                             <input
                                 type="number"
                                 value={priceMax}
-                                onChange={(e) => { setPriceMax(e.target.value); setCurrentPage(1); }}
+                                onChange={(e) => handlePriceChange(priceMin, e.target.value)}
                                 placeholder="99999"
                                 className="w-32 px-3 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
@@ -155,13 +145,13 @@ export function CategoryFilter({ products }: CategoryFilterProps) {
             )}
 
             {/* Product Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {paginatedProducts.map((product, index) => (
+            <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity duration-200 ${isPending ? "opacity-40" : "opacity-100"}`}>
+                {products.map((product, index) => (
                     <ProductCard key={product.id} product={product} rank={(currentPage - 1) * ITEMS_PER_PAGE + index + 1} />
                 ))}
             </div>
 
-            {filteredAndSorted.length === 0 && (
+            {products.length === 0 && (
                 <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                     ไม่พบสินค้าตามเงื่อนไขที่เลือก
                 </div>
@@ -171,8 +161,8 @@ export function CategoryFilter({ products }: CategoryFilterProps) {
             <Pagination
                 currentPage={currentPage}
                 totalPages={totalPages}
-                onPageChange={setCurrentPage}
-                totalItems={filteredAndSorted.length}
+                onPageChange={handlePageChange}
+                totalItems={totalItems}
                 itemsPerPage={ITEMS_PER_PAGE}
             />
         </div>

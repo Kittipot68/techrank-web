@@ -37,15 +37,26 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
     };
 }
 
-export default async function CategoryPage({ params }: CategoryPageProps) {
-    const { slug } = await params;
+export default async function CategoryPage({ 
+    params,
+    searchParams 
+}: { 
+    params: Promise<{ slug: string }>,
+    searchParams: Promise<{ page?: string; sort?: string; min?: string; max?: string }>
+}) {
+    const [{ slug }, query] = await Promise.all([params, searchParams]);
     const category = await getCategoryBySlug(slug);
 
     if (!category) {
         notFound();
     }
 
-    const products = await getProductsByCategory(category.id);
+    const page = Number(query.page) || 1;
+    const sort = query.sort || 'score-desc';
+    const min = query.min ? Number(query.min) : undefined;
+    const max = query.max ? Number(query.max) : undefined;
+
+    const { products, total } = await getProductsByCategory(category.id, page, 12, sort, min, max);
 
     return (
         <div className="container mx-auto px-4 py-8">
@@ -54,12 +65,16 @@ export default async function CategoryPage({ params }: CategoryPageProps) {
                     Best {category.name}
                 </h1>
                 <p className="mt-4 text-slate-500 dark:text-slate-400">
-                    จัดอันดับและรีวิว {category.name.toLowerCase()} จากการทดสอบจริง
+                    จัดอันดับและรีวิว {category.name.toLowerCase()} จากการทดสอบจริง (ทั้งหมด {total} รายการ)
                 </p>
             </div>
 
-            {products.length > 0 ? (
-                <CategoryFilter products={products} />
+            {total > 0 ? (
+                <CategoryFilter 
+                    products={products} 
+                    totalItems={total} 
+                    currentPage={page} 
+                />
             ) : (
                 <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                     ยังไม่มีสินค้าในหมวดหมู่นี้
