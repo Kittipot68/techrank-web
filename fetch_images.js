@@ -104,14 +104,30 @@ async function fetchShopeeProductData(shopId, itemId) {
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Referer': `https://shopee.co.th/product/${shopId}/${itemId}`,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
         'Accept': 'application/json',
-        'Accept-Language': 'th-TH,th;q=0.9,en;q=0.8',
+        'Accept-Language': 'th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Referer': 'https://shopee.co.th/',
+        'Origin': 'https://shopee.co.th',
+        'X-API-Source': 'pc',
+        'X-Shopee-Language': 'th',
         'X-Requested-With': 'XMLHttpRequest',
+        'Sec-Ch-Ua': '\"Not;A=Brand\";v=\"99\", \"Google Chrome\";v=\"128\", \"Chromium\";v=\"128\"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '\"Windows\"',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+        'Cookie': 'SPC_IA=-1; SPC_EC=-; SPC_F=GUR7Y5Xq3Z0rI2U9X0Z0Z0Z0Z0Z0Z0Z0; REC_T_ID=0;',
       }
     });
-    if (!res.ok) return null;
+
+    if (!res.ok) {
+      if (res.status === 403) console.error(`   🛑 403 Forbidden (Blocked by Shopee)`);
+      else if (res.status === 429) console.error(`   🛑 429 Too Many Requests`);
+      else console.error(`   🛑 HTTP Error: ${res.status}`);
+      return null;
+    }
     const json = await res.json();
     const d = json?.data;
     if (!d) return null;
@@ -276,8 +292,8 @@ async function run() {
       productUpdate.image_url  = shopeeData.imageUrl;
       updatedImages++;
     }
-    // บันทึกรูปภาพทั้งหมดไว้ใน images[] (จะแสดงใน gallery)
-    if (shopeeData.allImageUrls?.length > 0) {
+    // บันทึกรูปภาพทั้งหมดไว้ใน images[] (จะแสดงใน gallery) — ตรวจสอบ column ก่อนเพื่อกัน Error
+    if (hasImagesColumn && shopeeData.allImageUrls?.length > 0) {
       productUpdate.images = shopeeData.allImageUrls;
     }
     if (priceMin) productUpdate.price_min = priceMin;
