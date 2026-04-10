@@ -402,22 +402,29 @@ function parseCSVLine(line) {
 async function run() {
   console.log("🔥 Starting Full Premium Import...\n");
 
-  // Ensure categories
-  const required = [
-    { name: 'Headphones', slug: 'headphones' },
-    { name: 'Earbuds', slug: 'earbuds' },
-    { name: 'Speakers', slug: 'speakers' },
-    { name: 'Gaming Gear', slug: 'gaming-gear' }
-  ];
-  for (const cat of required) {
-    const { data } = await supabase.from('categories').select('id').eq('slug', cat.slug).single();
-    if (!data) {
-      await supabase.from('categories').insert({ name: cat.name, slug: cat.slug });
-      console.log(`Created category: ${cat.name}`);
+  // 1. Ensure all categories from productDB exist
+  const uniqueCats = [...new Set(Object.values(productDB).map(p => p.cat))];
+  const { data: existingCats } = await supabase.from('categories').select('id, slug');
+  const catCache = {};
+  existingCats?.forEach(c => catCache[c.slug] = c.id);
+
+  for (const catSlug of uniqueCats) {
+    if (!catCache[catSlug]) {
+      // Create new category if it doesn't exist
+      // Capitalize slug for name (e.g., 'gaming-gear' -> 'Gaming Gear')
+      const name = catSlug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      const { data: newCat, error } = await supabase.from('categories').insert({ name, slug: catSlug }).select('id').single();
+      
+      if (error) {
+        console.error(`❌ Error creating category ${catSlug}:`, error.message);
+      } else if (newCat) {
+        catCache[catSlug] = newCat.id;
+        console.log(`✨ Created new category: ${name}`);
+      }
     }
   }
-  const { data: categories } = await supabase.from('categories').select('id, slug');
-  const getCatId = (slug) => categories.find(c => c.slug === slug)?.id;
+
+  const getCatId = (slug) => catCache[slug];
 
   // Read all CSV files from DATA directory
   const dataDir = 'D:\\MY_FIRST_WEB\\DATA';
