@@ -276,6 +276,10 @@ async function run() {
       productUpdate.image_url  = shopeeData.imageUrl;
       updatedImages++;
     }
+    // บันทึกรูปภาพทั้งหมดไว้ใน images[] (จะแสดงใน gallery)
+    if (shopeeData.allImageUrls?.length > 0) {
+      productUpdate.images = shopeeData.allImageUrls;
+    }
     if (priceMin) productUpdate.price_min = priceMin;
     if (priceMax) productUpdate.price_max = priceMax;
     if (bestAffiliate) productUpdate.affiliate_url = bestAffiliate;
@@ -294,7 +298,8 @@ async function run() {
       const { error } = await supabase.from('products').update(productUpdate).eq('slug', slug);
       if (error) console.error(`   ❌ DB error: ${error.message}`);
       else {
-        if (productUpdate.image_url) console.log(`   📸 รูป: ${shopeeData.imageUrl?.substring(0, 60)}...`);
+        if (productUpdate.image_url) console.log(`   📸 รูปหลัก: ${shopeeData.imageUrl?.substring(0, 55)}...`);
+        if (productUpdate.images) console.log(`   🖼️  รูปทั้งหมด: ${productUpdate.images.length} รูป`);
         if (productUpdate.price_min) console.log(`   💰 ราคา: ${priceMin} - ${priceMax} บาท`);
         if (productUpdate.description) console.log(`   📝 เพิ่ม description (${shopeeData.description?.length} ตัวอักษร)`);
       }
