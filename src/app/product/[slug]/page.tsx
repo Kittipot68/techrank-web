@@ -10,6 +10,7 @@ import { StarRating } from "@/components/StarRating";
 import { ShareButtons } from "@/components/ShareButtons";
 import { WishlistButton } from "@/components/WishlistButton";
 import { ViewCounter } from "@/components/ViewCounter";
+import { ProductImageGallery } from "@/components/ProductImageGallery";
 
 interface ProductPageProps {
     params: Promise<{
@@ -67,12 +68,17 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
     const viewCount = await getViewCount(product.id);
 
+    const allImages = Array.from(new Set([
+        ...(product.image_url ? [product.image_url] : []),
+        ...(product.images || []),
+    ])).filter(Boolean);
+
     // JSON-LD structured data for Google Rich Snippets
     const jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'Product',
         name: product.name,
-        image: product.image_url || "https://techrank-demo.vercel.app/og-default.jpg",
+        image: allImages.length > 0 ? allImages : ["https://techrank-demo.vercel.app/og-default.jpg"],
         description: `รีวิวเจาะลึก ${product.name}`,
         category: product.categories?.name,
         offers: {
@@ -88,7 +94,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
             ratingValue: product.overall_score,
             bestRating: 10,
             worstRating: 1,
-            ratingCount: viewCount > 5 ? viewCount : 5, // Fallback realistic minimum rating count
+            ratingCount: viewCount > 5 ? viewCount : 5,
         } : undefined,
     };
 
@@ -110,18 +116,13 @@ export default async function ProductPage({ params }: ProductPageProps) {
             </nav>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-                {/* Left Column: Image & Affiliate */}
+                {/* Left Column: Image Gallery & Affiliate */}
                 <div className="lg:col-span-4 space-y-4">
-                    <div className="aspect-square bg-white rounded-2xl flex items-center justify-center text-slate-400 border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden relative group/hero">
-                        {product.image_url ? (
-                            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-8 transition-transform duration-500 group-hover/hero:scale-110" />
-                        ) : (
-                            <div className="text-center text-slate-300">
-                                <div className="text-6xl mb-3 opacity-50">📦</div>
-                                <span className="text-sm font-medium">รูปภาพเร็วๆ นี้</span>
-                            </div>
-                        )}
-                    </div>
+                    <ProductImageGallery
+                        mainImage={product.image_url}
+                        images={product.images}
+                        productName={product.name}
+                    />
 
                     {/* Buy Box */}
                     <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-6 bg-gradient-to-b from-white to-slate-50 dark:from-slate-800 dark:to-slate-900 space-y-4">

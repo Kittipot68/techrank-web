@@ -21,6 +21,7 @@ export type ProductWithCategory = {
     description: string | null;
     affiliate_url: string | null;
     image_url: string | null;
+    images: string[] | null;          // รูปภาพทั้งหมด (หลายรูป จาก Shopee)
     created_at: string;
     categories: {
         id: string;

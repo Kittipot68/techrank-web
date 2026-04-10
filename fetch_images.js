@@ -116,9 +116,12 @@ async function fetchShopeeProductData(shopId, itemId) {
     const d = json?.data;
     if (!d) return null;
 
-    // ── รูปภาพ ──
-    const imageHash = d.image || d.images?.[0];
-    const imageUrl = imageHash ? `https://down-th.img.susercontent.com/file/${imageHash}` : null;
+    // ── รูปภาพทั้งหมด ──
+    const imageHashes = d.images || (d.image ? [d.image] : []);
+    const allImageUrls = imageHashes
+      .filter(Boolean)
+      .map(h => `https://down-th.img.susercontent.com/file/${h}`);
+    const imageUrl = allImageUrls[0] || null; // รูปแรก = รูปหลัก
 
     // ── ราคา ──
     const priceMin = d.price_min ? d.price_min / 100000 : null;
@@ -131,14 +134,12 @@ async function fetchShopeeProductData(shopId, itemId) {
     const brand = d.brand || null;
 
     // ── Attributes (Specs) จาก Shopee ──
-    // Shopee จะให้ attributes มาเป็น array เช่น [{name: 'ความเชื่อมต่อ', value: 'Bluetooth'}]
     const rawAttributes = d.attributes || [];
     const specs = rawAttributes
       .filter(a => a.name && a.value)
       .map(a => ({ key: a.name, value: a.value }));
 
-    // ── Specifications (เพิ่มเติม) ──
-    // บางรุ่นมี tier_variations หรือ field อื่น ─ รวมให้ครบ
+    // ── Tier Variations (สี, ขนาด ฯลฯ) ──
     const tierVariations = (d.tier_variations || [])
       .filter(t => t.name && t.options?.length > 0)
       .map(t => ({ key: t.name, value: t.options.join(' / ') }));
@@ -152,6 +153,7 @@ async function fetchShopeeProductData(shopId, itemId) {
 
     return {
       imageUrl,
+      allImageUrls,           // ← รูปทั้งหมด (max ~9 รูปจาก Shopee)
       priceMin,
       priceMax,
       description,
