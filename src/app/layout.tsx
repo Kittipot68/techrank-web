@@ -40,12 +40,15 @@ export const metadata: Metadata = {
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { getAllCategories } from "@/lib/queries";
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const categories = await getAllCategories();
+
   return (
     <html lang="th" suppressHydrationWarning>
       <head>
@@ -75,7 +78,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col font-sans bg-background text-foreground`}
       >
         <ThemeProvider>
-          <Header />
+          <Header categories={categories} />
           <main className="flex-1">
             {children}
           </main>
