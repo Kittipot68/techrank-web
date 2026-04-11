@@ -1,5 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const cheerio = require('cheerio');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config({ path: '.env.local' });
 
 const supabase = createClient(
@@ -11,7 +13,7 @@ const supabase = createClient(
 // ⚙️ CONFIGURATION
 // ----------------------------------------------------
 const DELAY_MS = 2000; // Protection from IP ban
-const BATCH_SIZE = 1;  // Process one by one for safety
+const DATA_DIR = path.join(__dirname, 'DATA');
 
 // ----------------------------------------------------
 // 🛠️ HELPERS
@@ -30,6 +32,42 @@ async function unshortenUrl(url) {
 
 function delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Loads all Shopee IDs and Prices from CSV files in DATA/
+ */
+function loadPriceMap() {
+    const priceMap = new Map();
+    try {
+        const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.csv'));
+        files.forEach(file => {
+            const content = fs.readFileSync(path.join(DATA_DIR, file), 'utf-8');
+            const lines = content.split('\n').slice(1); // Skip header
+            lines.forEach(line => {
+                const parts = line.split(',');
+                if (parts.length >= 3) {
+                    const id = parts[0].trim();
+                    let price = parts[2].trim();
+                    // Clean price (e.g., 1.1พัน -> 1100, 3.2พัน -> 3200)
+                    if (price.includes('พัน')) {
+                        price = parseFloat(price.replace('พัน', '')) * 1000;
+                    } else if (price.includes('หมื่น')) {
+                        price = parseFloat(price.replace('หมื่น', '')) * 10000;
+                    } else {
+                        price = parseFloat(price.replace(/[^0-9.]/g, ''));
+                    }
+                    if (id && !isNaN(price)) {
+                        priceMap.set(id, price);
+                    }
+                }
+            });
+        });
+        console.log(`📊 Loaded ${priceMap.size} unique product prices from CSVs.`);
+    } catch (e) {
+        console.error('❌ Error loading price map:', e.message);
+    }
+    return priceMap;
 }
 
 // ----------------------------------------------------
@@ -54,54 +92,35 @@ async function fetchEliteData(shopId, itemId) {
         const html = await res.text();
         const $ = cheerio.load(html);
         
-        // 🕵️ EXTRACTION LOOPHOLE: Look for the SSR data script
         const jsonStringMatch = html.match(/<script [^>]*type="text\/mfe-initial-data"[^>]*>(.*?)<\/script>/s);
-        if (!jsonStringMatch) {
-            console.error('   ❌ Could not find data script in HTML (Proxy might be blocked or structure changed)');
-            return null;
-        }
+        if (!jsonStringMatch) return null;
 
         const fullState = JSON.parse(jsonStringMatch[1]);
-        
-        // Find item path in deep object
         const itemData = fullState?.initialState?.DOMAIN_PDP?.data?.PDP_BFF_DATA?.cachedMap[`${shopId}/${itemId}`]?.item 
                        || fullState?.initialState?.item;
 
-        if (!itemData) {
-            console.error('   ❌ Item data not found in JSON state');
-            return null;
-        }
+        if (!itemData) return null;
 
         const d = itemData;
 
         // 🖼️ Images
         const imageHashes = d.images || (d.image ? [d.image] : []);
-        const allImageUrls = imageHashes
-            .filter(Boolean)
-            .map(h => `https://down-th.img.susercontent.com/file/${h}`);
-        const mainImageUrl = allImageUrls[0] || null;
+        const allImageUrls = imageHashes.filter(Boolean).map(h => `https://down-th.img.susercontent.com/file/${h}`);
 
-        // 💰 Price
-        let priceMin = d.price_min || d.price;
-        if (priceMin > 100000) priceMin = priceMin / 100000;
-        
-        let priceMax = d.price_max || d.price;
-        if (priceMax > 100000) priceMax = priceMax / 100000;
-
-        // 📝 Description
+        // 📝 Description (Raw text often contains rich specs)
         const description = d.description || d.rich_text_description?.text || null;
 
-        // ⚙️ Specs (Attributes)
+        // ⚙️ Specs (Shopee Attributes)
         const rawAttributes = d.attributes || [];
         const specs = rawAttributes
-            .filter(a => a.name && a.value)
+            .filter(a => a.name && a.value && a.value !== '-')
             .map(a => ({ key: a.name, value: a.value }));
 
         return {
-            mainImageUrl,
+            mainImageUrl: allImageUrls[0] || null,
             allImageUrls,
-            priceMin,
-            priceMax,
+            priceMin: d.price_min || d.price || null,
+            priceMax: d.price_max || d.price || null,
             description,
             specs,
             name: d.name
@@ -113,56 +132,86 @@ async function fetchEliteData(shopId, itemId) {
 }
 
 // ----------------------------------------------------
-// 🧠 AI EXPERT SYNTHESIS (Generating Premium Content)
+// 🧠 AI EXPERT SYNTHESIS (Category-Aware + High Precision)
 // ----------------------------------------------------
 
-function synthesizeExpertContent(name, specs, shopeeDesc) {
-    // This function mimics an AI transformation of raw specs into premium content
-    const specStr = specs.map(s => `${s.key}: ${s.value}`).join(', ');
-    
-    // 🔍 Expert Scoring Logic (Inference based on specs)
+function synthesizeExpertContentV2(name, rawSpecs, shopeeDesc, category) {
+    // 🏷️ Category Analysis
+    const cat = category?.toLowerCase() || "";
+    const isAudio = cat.includes('headphone') || cat.includes('speaker') || cat.includes('earphone');
+    const isGaming = cat.includes('mouse') || cat.includes('keyboard') || cat.includes('headphone');
+    const isHome = cat.includes('vac') || cat.includes('pet') || cat.includes('appliance');
+
+    // 🔨 Extract Better Specs from Description Text
+    const extractedSpecs = [...rawSpecs];
+    if (shopeeDesc) {
+        // Simple regex to find common spec patterns in text like "BT 5.3", "Battery 50h", etc.
+        const patterns = [
+            { key: "รุ่นแบรนด์", regex: /รุ่น\s*[:：]?\s*([A-Za-z0-9-]+)/i },
+            { key: "แบตเตอรี่", regex: /แบตเตอรี่\s*[:：]?\s*([0-9]+\s*(?:mAh|ชม|ชั่วโมง|h))/i },
+            { key: "บลูทูธ", regex: /Bluetooth\s*[:：]?\s*([0-9.]+)/i },
+            { key: "วัสดุ", regex: /วัสดุ\s*[:：]?\s*([^\n,]+)/i },
+            { key: "แรงดูด/ความแรง", regex: /([0-9]+\s*(?:Pa|BTU|W))/i },
+        ];
+        patterns.forEach(p => {
+            const m = shopeeDesc.match(p.regex);
+            if (m && !extractedSpecs.find(s => s.key === p.key)) {
+                extractedSpecs.push({ key: p.key, value: m[1] });
+            }
+        });
+    }
+
+    // 🔍 Realistic Scoring Logic
     let sound = 8.0, comfort = 8.0, build = 8.0, fps = 7.0;
+    const specStr = shopeeDesc + " " + extractedSpecs.map(s => s.value).join(" ");
     
-    // Sound Analysis
-    if (specStr.toLowerCase().includes('ldac') || specStr.toLowerCase().includes('hi-res') || specStr.toLowerCase().includes('planar')) sound += 1.5;
-    if (specStr.toLowerCase().includes('anc') || specStr.toLowerCase().includes('noise cancellation')) sound += 0.5;
-    
-    // Gaming/FPS Analysis
-    if (specStr.toLowerCase().includes('latency') || specStr.toLowerCase().includes('2.4ghz') || specStr.toLowerCase().includes('dongle')) fps += 2.0;
-    if (name.toLowerCase().includes('gaming') || name.toLowerCase().includes('inzone')) fps += 1.5;
+    if (isAudio) {
+        if (specStr.includes('ANC') || specStr.includes('Noise')) sound += 0.5;
+        if (specStr.includes('LDAC') || specStr.includes('Hi-Res')) sound += 1.0;
+    }
+    if (isGaming) {
+        if (specStr.includes('latency') || specStr.includes('2.4GHz')) fps += 2.0;
+        if (specStr.includes('3395') || specStr.includes('sensor')) fps += 1.0;
+    }
 
-    // Comfort/Build
-    if (specStr.toLowerCase().includes('leather') || specStr.toLowerCase().includes('plush')) comfort += 1.0;
-    if (specStr.toLowerCase().includes('aluminum') || specStr.toLowerCase().includes('metal')) build += 1.0;
-
-    // 📝 Generating Pros/Cons based on facts
+    // 📝 Pros & Cons (Category-Aware)
     const pros = [];
     const cons = [];
 
-    if (sound >= 9) pros.push("คุณภาพเสียงระดับ Hi-Res ชัดเจนทุกรายละเอียด");
-    if (specStr.toLowerCase().includes('anc')) pros.push("ระบบตัดเสียงรบกวนประสิทธิภาพสูง");
-    if (specStr.toLowerCase().includes('bluetooth 5')) pros.push("การเชื่อมต่อ Bluetooth รุ่นใหม่ เสถียรและประหยัดพลังงาน");
-    if (fps >= 9) pros.push("Latency ต่ำมาก เหมาะสําหรับการเล่นเกมสาย Competitive");
+    if (isAudio) {
+        if (sound >= 8.5) pros.push("คุณภาพเสียงระดับ Hi-Res คมชัด");
+        if (specStr.includes('ANC')) pros.push("ตัดเสียงรบกวนได้เงียบสนิท");
+    } else if (isHome) {
+        if (specStr.includes('อัจฉริยะ') || specStr.includes('AI')) pros.push("รองรับระบบ AI และการควบคุมผ่านแอป");
+        pros.push("ดีไซน์มินิมอล เข้ากับบ้านได้ง่าย");
+    } else {
+        pros.push("ความคุ้มค่าสูงเมื่อเทียบกับฟีเจอร์");
+        pros.push("ดีไซน์ล้ำสมัย แข็งแรงทนทาน");
+    }
     
-    if (!specStr.toLowerCase().includes('anc')) cons.push("ไม่มีระบบตัดเสียงรบกวน (ANC)");
-    if (specStr.toLowerCase().includes('wired') || specStr.toLowerCase().includes('สาย')) cons.push("มีสายเชื่อมต่อ อาจไม่สะดวกเท่าไร้สาย");
-    if (name.toLowerCase().includes('premium')) cons.push("ราคาสูงเมื่อเทียบกับรุ่นทั่วไป");
+    if (extractedSpecs.length > 5) pros.push("สเปคจัดเต็ม ครบเครื่องทุกการใช้งาน");
 
-    if (pros.length === 0) pros.push("ความคุ้มค่าสูงเมื่อเทียบกับราคา", "ดีไซน์สวยงาม ทันสมัย");
-    if (cons.length === 0) cons.push("วัสดุส่วนใหญ่เป็นพลาสติก");
+    if (!specStr.includes('ประกัน') && !specStr.includes('Warranty')) cons.push("โปรดตรวจสอบเงื่อนไขการรับประกัน");
+    if (specStr.includes('มีสาย') || specStr.includes('Wired')) cons.push("ดีไซน์แบบมีสาย อาจพกพาไม่สะดวก");
+    if (isAudio && !specStr.includes('ANC')) cons.push("ไม่มีระบบตัดเสียงรบกวน");
+    
+    if (cons.length < 2) cons.push("วัสดุส่วนใหญ่เป็นพลาสติก");
 
     // ✍️ Synthetic Expert Review (Thai)
-    const review = `บทวิเคราะห์จาก TechRank: ${name} เป็นผลิตภัณฑ์ที่น่าสนใจในหมวดหมู่ของมัน ด้วยคุณสมบัติที่โดดเด่นอย่าง ${specs[0]?.value || 'มาตรฐานคุณภาพ'} และ ${specs[1]?.value || 'ดีไซน์ที่ลงตัว'} จากการวิเคราะห์สเปคพบว่าเหมาะอย่างยิ่งสำหรับผู้ที่ต้องการ ${sound > 8.5 ? 'คุณภาพเสียงที่ยอดเยี่ยม' : 'ความสะดวกในการใช้งานทุกวัน'} โดยรวมถือเป็นตัวเลือกที่คุ้มค่าและตอบโจทย์การใช้งานในระยะยาว`;
+    const review = `บทวิเคราะห์จาก TechRank: ${name} รุ่นนี้ถือว่าเป็นตัวเลือกที่โดดเด่นในหมวด ${cat} โดยเฉพาะเรื่องของ ${extractedSpecs[0]?.value || 'ประสิทธิภาพ'} ที่ทำออกมาได้มาตรฐานระดับพรีเมียม จากการวิเคราะห์สเปคพบว่าการออกแบบเน้นไปที่ ${isGaming ? 'ความแม่นยำและการตอบสนอง' : 'ความสะดวกสบายในการใช้งานจริง'} สำหรับใครที่กำลังมองหา ${cat} ที่เน้น ${sound > 8.5 ? 'สุนทรียภาพ' : 'ความคุ้มค่า'} รุ่นนี้จะไม่ทำให้คุณผิดหวังแน่นอนครับ`;
 
     return {
-        description: review + "\n\n---\n\n" + (shopeeDesc?.substring(0, 1000) || ""),
+        description: review + "\n\n---\n\n" + (shopeeDesc?.substring(0, 1500) || ""),
         pros: pros.slice(0, 4),
         cons: cons.slice(0, 3),
-        overall_score: parseFloat(((sound + comfort + build) / 3).toFixed(1)),
-        sound_score: Math.min(10, sound),
-        comfort_score: Math.min(10, comfort),
-        build_score: Math.min(10, build),
-        fps_score: Math.min(10, fps)
+        scores: {
+            overall: parseFloat(((sound + comfort + build) / 3).toFixed(1)),
+            sound: Math.min(10, sound),
+            comfort: Math.min(10, comfort),
+            build: Math.min(10, build),
+            fps: Math.min(10, fps)
+        },
+        specs: extractedSpecs.slice(0, 10)
     };
 }
 
@@ -172,16 +221,17 @@ function synthesizeExpertContent(name, specs, shopeeDesc) {
 
 async function run() {
     console.log("==========================================");
-    console.log("🚀 TECHRANK UNIVERSAL AI EXPERT SCRAPER");
+    console.log("🚀 TECHRANK UNIVERSAL AI EXPERT SCRAPER v2");
     console.log("==========================================\n");
 
-    // Get products with Shopee links but missing detailed data or having placeholder images
+    const priceMap = loadPriceMap();
+
     const { data: products, error } = await supabase
         .from('products')
-        .select('*')
+        .select('*, categories(name, slug)')
         .ilike('affiliate_url', '%shopee%')
-        // Target items with null pros or placeholders
-        .or('pros.is.null,overall_score.is.null,image_url.is.null,description.ilike.%TechRank:%')
+        // Target items with null prices, null pros or generic descriptions
+        .or('price_min.is.null,pros.is.null,description.ilike.%TechRank:%')
         .order('id', { ascending: true });
 
     if (error) {
@@ -193,89 +243,70 @@ async function run() {
 
     for (let i = 0; i < products.length; i++) {
         const p = products[i];
-        const prefix = `[${i+1}/${products.length}] ${p.slug}`;
+        console.log(`\n🔄 [${i+1}/${products.length}] Processing: ${p.name}`);
         
-        console.log(`\n🔄 Processing: ${p.name || p.slug}`);
-        
-        // 1. Resolve URL
-        process.stdout.write(`   🔗 Resolving URL... `);
-        const fullUrl = await unshortenUrl(p.affiliate_url);
-        const match = fullUrl.match(/\/(\d+)\/(\d+)/);
-        
-        if (!match) {
-            console.log(`❌ Failed (ID not found in ${fullUrl})`);
-            continue;
+        // 1. Extract Shopee ID
+        const urlMatch = p.affiliate_url.match(/\/(\d+)\/(\d+)/);
+        let shopId, itemId;
+        if (urlMatch) {
+            [_, shopId, itemId] = urlMatch;
+        } else {
+            const fullUrl = await unshortenUrl(p.affiliate_url);
+            const m = fullUrl.match(/\/(\d+)\/(\d+)/);
+            if (!m) { console.log(`   ❌ IDs not found`); continue; }
+            [_, shopId, itemId] = m;
         }
-        
-        const [_, shopId, itemId] = match;
-        console.log(`✅ IDs: ${shopId}/${itemId}`);
 
         // 2. Scrape Data
         process.stdout.write(`   📡 Scraping via Proxy... `);
         const eliteData = await fetchEliteData(shopId, itemId);
-
-        if (!eliteData) {
-            console.log(`❌ Failed`);
-            await delay(DELAY_MS);
-            continue;
-        }
+        if (!eliteData) { console.log(`❌ Failed`); continue; }
         console.log(`✅ Success`);
 
-        // 🧠 3. AI Expert Synthesis
-        process.stdout.write(`   🧠 Synthesizing AI Expert Review... `);
-        const expert = synthesizeExpertContent(p.name || eliteData.name, eliteData.specs, eliteData.description);
+        // 💰 Price Logic: Preferred order (Live SSR -> CSV Map -> Existing DB)
+        let price = eliteData.priceMin || priceMap.get(itemId) || p.price_min;
+        if (price && price > 100000) price = price / 100000;
+        
+        // 🧠 3. AI Expert Synthesis v2
+        process.stdout.write(`   🧠 Synthesizing Expert Content... `);
+        const expert = synthesizeExpertContentV2(p.name || eliteData.name, eliteData.specs, eliteData.description, p.categories?.slug);
         console.log(`✅ Done`);
 
         // 4. Update DB
         process.stdout.write(`   💾 Saving to Database... `);
-        
-        const productUpdates = {
-            image_url: eliteData.mainImageUrl,
-            images: eliteData.allImageUrls,
-            price_min: eliteData.priceMin,
-            price_max: eliteData.priceMax,
-            // Premium Fields
+        const updates = {
+            image_url: eliteData.mainImageUrl || p.image_url,
+            images: eliteData.allImageUrls.length > 0 ? eliteData.allImageUrls : p.images,
+            price_min: price,
+            price_max: eliteData.priceMax ? (eliteData.priceMax > 100000 ? eliteData.priceMax/100000 : eliteData.priceMax) : price,
             description: expert.description,
             pros: expert.pros,
             cons: expert.cons,
-            overall_score: expert.overall_score,
-            sound_score: expert.sound_score,
-            comfort_score: expert.comfort_score,
-            build_score: expert.build_score,
-            fps_score: expert.fps_score
+            overall_score: expert.scores.overall,
+            sound_score: expert.scores.sound,
+            comfort_score: expert.scores.comfort,
+            build_score: expert.scores.build,
+            fps_score: expert.scores.fps
         };
 
-        const { error: upErr } = await supabase.from('products').update(productUpdates).eq('id', p.id);
+        const { error: upErr } = await supabase.from('products').update(updates).eq('id', p.id);
         
         if (upErr) {
             console.log(`❌ Error: ${upErr.message}`);
         } else {
-            // Update Specs
-            if (eliteData.specs.length > 0) {
-                // Remove generic template specs if they exist (usually 10+ identical items)
-                await supabase.from('specs').delete().eq('product_id', p.id);
-                
-                const { error: specErr } = await supabase.from('specs').insert(
-                    eliteData.specs.map(s => ({ 
-                        product_id: p.id, 
-                        key: s.key, 
-                        value: s.value 
-                    }))
-                );
-                
-                if (specErr) console.log(` (Spec error: ${specErr.message})`);
-                else console.log(`✅ OK (${eliteData.specs.length} real specs + Premium Analysis)`);
-            } else {
-                console.log(`✅ OK (Premium Analysis saved)`);
-            }
+            // Update Specs Table
+            await supabase.from('specs').delete().eq('product_id', p.id);
+            await supabase.from('specs').insert(
+                expert.specs.map(s => ({ product_id: p.id, key: s.key, value: s.value }))
+            );
+            console.log(`✅ OK (${expert.specs.length} optimized specs)`);
         }
 
-        // Safety Delay
         await delay(DELAY_MS);
     }
 
     console.log("\n==========================================");
-    console.log(`🎉 ELITE ENRICHMENT COMPLETE!`);
+    console.log(`🎉 ELITE ENRICHMENT v2 COMPLETE!`);
     console.log("==========================================");
 }
 
