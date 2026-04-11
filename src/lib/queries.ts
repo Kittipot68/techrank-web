@@ -81,6 +81,7 @@ export async function getAllProducts(): Promise<ProductWithCategory[]> {
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
+        .not("overall_score", "is", null) // 🛡️ Quality Filter: Only show enriched items
         .order("overall_score", { ascending: false, nullsFirst: false });
 
     if (error) {
@@ -94,6 +95,7 @@ export async function getTopProducts(limit = 3): Promise<ProductWithCategory[]> 
     const { data, error } = await supabase
         .from("products")
         .select("*, categories(*)")
+        .not("overall_score", "is", null) // 🛡️ Quality Filter: Only show enriched items
         .order("overall_score", { ascending: false, nullsFirst: false })
         .limit(limit);
 
@@ -118,7 +120,8 @@ export async function getProductsByCategory(
     let query = supabase
         .from("products")
         .select("*, categories(*)", { count: 'exact' })
-        .eq("category_id", categoryId);
+        .eq("category_id", categoryId)
+        .not("overall_score", "is", null); // 🛡️ Quality Filter: Only show enriched items
 
     // Filter by Price
     if (priceMin !== undefined) query = query.gte('price_min', priceMin);
