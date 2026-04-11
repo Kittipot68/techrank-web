@@ -113,12 +113,66 @@ async function fetchEliteData(shopId, itemId) {
 }
 
 // ----------------------------------------------------
+// 🧠 AI EXPERT SYNTHESIS (Generating Premium Content)
+// ----------------------------------------------------
+
+function synthesizeExpertContent(name, specs, shopeeDesc) {
+    // This function mimics an AI transformation of raw specs into premium content
+    const specStr = specs.map(s => `${s.key}: ${s.value}`).join(', ');
+    
+    // 🔍 Expert Scoring Logic (Inference based on specs)
+    let sound = 8.0, comfort = 8.0, build = 8.0, fps = 7.0;
+    
+    // Sound Analysis
+    if (specStr.toLowerCase().includes('ldac') || specStr.toLowerCase().includes('hi-res') || specStr.toLowerCase().includes('planar')) sound += 1.5;
+    if (specStr.toLowerCase().includes('anc') || specStr.toLowerCase().includes('noise cancellation')) sound += 0.5;
+    
+    // Gaming/FPS Analysis
+    if (specStr.toLowerCase().includes('latency') || specStr.toLowerCase().includes('2.4ghz') || specStr.toLowerCase().includes('dongle')) fps += 2.0;
+    if (name.toLowerCase().includes('gaming') || name.toLowerCase().includes('inzone')) fps += 1.5;
+
+    // Comfort/Build
+    if (specStr.toLowerCase().includes('leather') || specStr.toLowerCase().includes('plush')) comfort += 1.0;
+    if (specStr.toLowerCase().includes('aluminum') || specStr.toLowerCase().includes('metal')) build += 1.0;
+
+    // 📝 Generating Pros/Cons based on facts
+    const pros = [];
+    const cons = [];
+
+    if (sound >= 9) pros.push("คุณภาพเสียงระดับ Hi-Res ชัดเจนทุกรายละเอียด");
+    if (specStr.toLowerCase().includes('anc')) pros.push("ระบบตัดเสียงรบกวนประสิทธิภาพสูง");
+    if (specStr.toLowerCase().includes('bluetooth 5')) pros.push("การเชื่อมต่อ Bluetooth รุ่นใหม่ เสถียรและประหยัดพลังงาน");
+    if (fps >= 9) pros.push("Latency ต่ำมาก เหมาะสําหรับการเล่นเกมสาย Competitive");
+    
+    if (!specStr.toLowerCase().includes('anc')) cons.push("ไม่มีระบบตัดเสียงรบกวน (ANC)");
+    if (specStr.toLowerCase().includes('wired') || specStr.toLowerCase().includes('สาย')) cons.push("มีสายเชื่อมต่อ อาจไม่สะดวกเท่าไร้สาย");
+    if (name.toLowerCase().includes('premium')) cons.push("ราคาสูงเมื่อเทียบกับรุ่นทั่วไป");
+
+    if (pros.length === 0) pros.push("ความคุ้มค่าสูงเมื่อเทียบกับราคา", "ดีไซน์สวยงาม ทันสมัย");
+    if (cons.length === 0) cons.push("วัสดุส่วนใหญ่เป็นพลาสติก");
+
+    // ✍️ Synthetic Expert Review (Thai)
+    const review = `บทวิเคราะห์จาก TechRank: ${name} เป็นผลิตภัณฑ์ที่น่าสนใจในหมวดหมู่ของมัน ด้วยคุณสมบัติที่โดดเด่นอย่าง ${specs[0]?.value || 'มาตรฐานคุณภาพ'} และ ${specs[1]?.value || 'ดีไซน์ที่ลงตัว'} จากการวิเคราะห์สเปคพบว่าเหมาะอย่างยิ่งสำหรับผู้ที่ต้องการ ${sound > 8.5 ? 'คุณภาพเสียงที่ยอดเยี่ยม' : 'ความสะดวกในการใช้งานทุกวัน'} โดยรวมถือเป็นตัวเลือกที่คุ้มค่าและตอบโจทย์การใช้งานในระยะยาว`;
+
+    return {
+        description: review + "\n\n---\n\n" + (shopeeDesc?.substring(0, 1000) || ""),
+        pros: pros.slice(0, 4),
+        cons: cons.slice(0, 3),
+        overall_score: parseFloat(((sound + comfort + build) / 3).toFixed(1)),
+        sound_score: Math.min(10, sound),
+        comfort_score: Math.min(10, comfort),
+        build_score: Math.min(10, build),
+        fps_score: Math.min(10, fps)
+    };
+}
+
+// ----------------------------------------------------
 // 🚀 MAIN RUNNER
 // ----------------------------------------------------
 
 async function run() {
     console.log("==========================================");
-    console.log("🚀 TECHRANK UNIVERSAL ELITE SCRAPER");
+    console.log("🚀 TECHRANK UNIVERSAL AI EXPERT SCRAPER");
     console.log("==========================================\n");
 
     // Get products with Shopee links but missing detailed data or having placeholder images
@@ -126,7 +180,8 @@ async function run() {
         .from('products')
         .select('*')
         .ilike('affiliate_url', '%shopee%')
-        .or('image_url.is.null,image_url.ilike.%unsplash%,description.is.null')
+        // Target items with null pros or placeholders
+        .or('pros.is.null,overall_score.is.null,image_url.is.null,description.ilike.%TechRank:%')
         .order('id', { ascending: true });
 
     if (error) {
@@ -166,20 +221,29 @@ async function run() {
         }
         console.log(`✅ Success`);
 
-        // 3. Update DB
+        // 🧠 3. AI Expert Synthesis
+        process.stdout.write(`   🧠 Synthesizing AI Expert Review... `);
+        const expert = synthesizeExpertContent(p.name || eliteData.name, eliteData.specs, eliteData.description);
+        console.log(`✅ Done`);
+
+        // 4. Update DB
         process.stdout.write(`   💾 Saving to Database... `);
         
         const productUpdates = {
             image_url: eliteData.mainImageUrl,
             images: eliteData.allImageUrls,
             price_min: eliteData.priceMin,
-            price_max: eliteData.priceMax
+            price_max: eliteData.priceMax,
+            // Premium Fields
+            description: expert.description,
+            pros: expert.pros,
+            cons: expert.cons,
+            overall_score: expert.overall_score,
+            sound_score: expert.sound_score,
+            comfort_score: expert.comfort_score,
+            build_score: expert.build_score,
+            fps_score: expert.fps_score
         };
-        
-        // Only update description if it's currently very short or null
-        if (!p.description || p.description.length < 100) {
-            productUpdates.description = eliteData.description?.substring(0, 3000);
-        }
 
         const { error: upErr } = await supabase.from('products').update(productUpdates).eq('id', p.id);
         
@@ -200,9 +264,9 @@ async function run() {
                 );
                 
                 if (specErr) console.log(` (Spec error: ${specErr.message})`);
-                else console.log(`✅ OK (${eliteData.specs.length} real specs)`);
+                else console.log(`✅ OK (${eliteData.specs.length} real specs + Premium Analysis)`);
             } else {
-                console.log(`✅ OK (No new specs)`);
+                console.log(`✅ OK (Premium Analysis saved)`);
             }
         }
 
