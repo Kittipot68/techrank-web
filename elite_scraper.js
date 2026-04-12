@@ -141,6 +141,7 @@ function synthesizeExpertContentV2(name, rawSpecs, shopeeDesc, category) {
     const isAudio = cat.includes('headphone') || cat.includes('speaker') || cat.includes('earphone');
     const isGaming = cat.includes('mouse') || cat.includes('keyboard') || cat.includes('headphone');
     const isHome = cat.includes('vac') || cat.includes('pet') || cat.includes('appliance');
+    const isDisplay = cat.includes('monitor') || cat.includes('screen') || cat.includes('tv') || cat.includes('display');
 
     // 🔨 Extract Better Specs from Description Text
     const extractedSpecs = [...rawSpecs];
@@ -150,8 +151,9 @@ function synthesizeExpertContentV2(name, rawSpecs, shopeeDesc, category) {
             { key: "รุ่นแบรนด์", regex: /รุ่น\s*[:：]?\s*([A-Za-z0-9-]+)/i },
             { key: "แบตเตอรี่", regex: /แบตเตอรี่\s*[:：]?\s*([0-9]+\s*(?:mAh|ชม|ชั่วโมง|h))/i },
             { key: "บลูทูธ", regex: /Bluetooth\s*[:：]?\s*([0-9.]+)/i },
-            { key: "วัสดุ", regex: /วัสดุ\s*[:：]?\s*([^\n,]+)/i },
-            { key: "แรงดูด/ความแรง", regex: /([0-9]+\s*(?:Pa|BTU|W))/i },
+            { key: "ความละเอียด", regex: /(4K|8K|UHD|1080p|Full HD)/i },
+            { key: "Refresh Rate", regex: /([0-9]+\s*(?:Hz|เฮิร์ตซ์))/i },
+            { key: "ขนาดหน้าจอ", regex: /([0-9]+\s*(?:นิ้ว|inch|"))/i },
         ];
         patterns.forEach(p => {
             const m = shopeeDesc.match(p.regex);
@@ -169,16 +171,20 @@ function synthesizeExpertContentV2(name, rawSpecs, shopeeDesc, category) {
         if (specStr.includes('ANC') || specStr.includes('Noise')) sound += 0.5;
         if (specStr.includes('LDAC') || specStr.includes('Hi-Res')) sound += 1.0;
     }
-    if (isGaming) {
-        if (specStr.includes('latency') || specStr.includes('2.4GHz')) fps += 2.0;
-        if (specStr.includes('3395') || specStr.includes('sensor')) fps += 1.0;
+    if (isGaming || isDisplay) {
+        if (specStr.includes('latency') || specStr.includes('2.4GHz') || specStr.includes('VRR')) fps += 2.0;
+        if (specStr.includes('3395') || specStr.includes('144Hz') || specStr.includes('240Hz')) fps += 1.0;
     }
 
     // 📝 Pros & Cons (Category-Aware)
     const pros = [];
     const cons = [];
 
-    if (isAudio) {
+    if (isDisplay) {
+        if (specStr.includes('4K')) pros.push("ความละเอียดระดับ 4K คมชัดสมจริง");
+        if (specStr.includes('144Hz') || specStr.includes('Hz')) pros.push("Refresh Rate สูง เล่นเกมและดูหนังลื่นไหล");
+        if (specStr.includes('Mini LED') || specStr.includes('QLED')) pros.push("เทคโนโลยีจอระดับพรีเมียม สีสันสดใส");
+    } else if (isAudio) {
         if (sound >= 8.5) pros.push("คุณภาพเสียงระดับ Hi-Res คมชัด");
         if (specStr.includes('ANC')) pros.push("ตัดเสียงรบกวนได้เงียบสนิท");
     } else if (isHome) {
@@ -191,14 +197,16 @@ function synthesizeExpertContentV2(name, rawSpecs, shopeeDesc, category) {
     
     if (extractedSpecs.length > 5) pros.push("สเปคจัดเต็ม ครบเครื่องทุกการใช้งาน");
 
+    if (isDisplay && (specStr.includes('ใหญ่') || specStr.includes('นิ้ว'))) {
+        cons.push("ขนาดค่อนข้างใหญ่ ต้องใช้พื้นที่จัดวางมาก");
+    }
     if (!specStr.includes('ประกัน') && !specStr.includes('Warranty')) cons.push("โปรดตรวจสอบเงื่อนไขการรับประกัน");
-    if (specStr.includes('มีสาย') || specStr.includes('Wired')) cons.push("ดีไซน์แบบมีสาย อาจพกพาไม่สะดวก");
     if (isAudio && !specStr.includes('ANC')) cons.push("ไม่มีระบบตัดเสียงรบกวน");
     
-    if (cons.length < 2) cons.push("วัสดุส่วนใหญ่เป็นพลาสติก");
+    if (cons.length < 1) cons.push("วัสดุส่วนใหญ่เป็นพลาสติก");
 
     // ✍️ Synthetic Expert Review (Thai)
-    const review = `บทวิเคราะห์จาก TechRank: ${name} รุ่นนี้ถือว่าเป็นตัวเลือกที่โดดเด่นในหมวด ${cat} โดยเฉพาะเรื่องของ ${extractedSpecs[0]?.value || 'ประสิทธิภาพ'} ที่ทำออกมาได้มาตรฐานระดับพรีเมียม จากการวิเคราะห์สเปคพบว่าการออกแบบเน้นไปที่ ${isGaming ? 'ความแม่นยำและการตอบสนอง' : 'ความสะดวกสบายในการใช้งานจริง'} สำหรับใครที่กำลังมองหา ${cat} ที่เน้น ${sound > 8.5 ? 'สุนทรียภาพ' : 'ความคุ้มค่า'} รุ่นนี้จะไม่ทำให้คุณผิดหวังแน่นอนครับ`;
+    const review = `บทวิเคราะห์จาก TechRank: ${name} รุ่นนี้ถือว่าเป็นตัวเลือกที่โดดเด่นในหมวด ${isDisplay ? 'จอภาพอัจฉริยะ' : cat} โดยเฉพาะเรื่องของ ${extractedSpecs.find(s => s.key.includes('ความละเอียด'))?.value || 'ประสิทธิภาพ'} ที่ทำออกมาได้มาตรฐานระพรีเมียม จากการวิเคราะห์สเปคพบว่าการออกแบบเน้นไปที่ ${isGaming || isDisplay ? 'คุณภาพการแสดงผลและการตอบสนอง' : 'ความสะดวกสบายในการใช้งานจริง'} สำหรับใครที่กำลังมองหา ${isDisplay ? 'ทีวีหรือจอมอนิเตอร์' : cat} ที่เน้น ${isDisplay ? 'สีสันและความคมชัด' : 'ความคุ้มค่า'} รุ่นนี้จะไม่ทำให้คุณผิดหวังแน่นอนครับ`;
 
     return {
         description: review + "\n\n---\n\n" + (shopeeDesc?.substring(0, 1500) || ""),
@@ -265,11 +273,20 @@ async function run() {
 
         // 💰 Price Logic: Preferred order (Live SSR -> CSV Map -> Existing DB)
         let price = eliteData.priceMin || priceMap.get(itemId) || p.price_min;
-        if (price && price > 100000) price = price / 100000;
+        // Handle malformed prices from earlier runs or weird scaling
+        if (price && price < 1000 && (p.name.includes('ทีวี') || p.name.includes('TV') || p.name.includes('นิ้ว'))) {
+            // If it's a TV and price is < 1000, it's likely scaled wrong (e.g. 65.1 instead of 65100)
+            const csvPrice = priceMap.get(itemId);
+            if (csvPrice && csvPrice > 1000) price = csvPrice;
+        }
         
+        // 🏗️ Improve Category Detection (Override if name contains strong keywords)
+        let catSlug = p.categories?.slug;
+        if (p.name.includes('ทีวี') || p.name.includes('TV')) catSlug = 'monitors'; // We'll map TVs to monitors/displays
+
         // 🧠 3. AI Expert Synthesis v2
         process.stdout.write(`   🧠 Synthesizing Expert Content... `);
-        const expert = synthesizeExpertContentV2(p.name || eliteData.name, eliteData.specs, eliteData.description, p.categories?.slug);
+        const expert = synthesizeExpertContentV2(p.name || eliteData.name, eliteData.specs, eliteData.description, catSlug);
         console.log(`✅ Done`);
 
         // 4. Update DB

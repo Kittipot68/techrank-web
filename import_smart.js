@@ -99,8 +99,17 @@ async function run() {
 
       const code = row[0]; // Shopee Product ID
       const name = row[1];
-      const priceStr = row[2].replace(/[^\d.]/g, '');
-      const price = parseFloat(priceStr) || 0;
+      
+      let rawPrice = row[2];
+      let price = 0;
+      if (rawPrice.includes('พัน')) {
+          price = parseFloat(rawPrice.replace('พัน', '').replace(/[^\d.]/g, '')) * 1000;
+      } else if (rawPrice.includes('หมื่น')) {
+          price = parseFloat(rawPrice.replace('หมื่น', '').replace(/[^\d.]/g, '')) * 10000;
+      } else {
+          price = parseFloat(rawPrice.replace(/[^\d.]/g, '')) || 0;
+      }
+
       const shopeeUrl = row[7];
       const affLink = row[8];
 
