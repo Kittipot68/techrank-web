@@ -107,8 +107,15 @@ async function fetchEliteData(shopId, itemId) {
         const imageHashes = d.images || (d.image ? [d.image] : []);
         const allImageUrls = imageHashes.filter(Boolean).map(h => `https://down-th.img.susercontent.com/file/${h}`);
 
-        // 📝 Description (Raw text often contains rich specs)
-        const description = d.description || d.rich_text_description?.text || null;
+        // 📝 Description (Raw text + Rich Text sections)
+        let description = d.description || "";
+        if (d.rich_text_description?.paragraph_list) {
+            const richText = d.rich_text_description.paragraph_list
+                .map(p => p.text || "")
+                .filter(Boolean)
+                .join("\n");
+            if (richText.length > description.length) description = richText;
+        }
 
         // ⚙️ Specs (Shopee Attributes)
         const rawAttributes = d.attributes || [];
@@ -151,17 +158,22 @@ function synthesizeExpertContentV2(name, rawSpecs, shopeeDesc, category) {
             { key: "รุ่นแบรนด์", regex: /รุ่น\s*[:：]?\s*([A-Za-z0-9-]+)/i },
             { key: "แบตเตอรี่", regex: /แบตเตอรี่\s*[:：]?\s*([0-9]+\s*(?:mAh|ชม|ชั่วโมง|h))/i },
             { key: "บลูทูธ", regex: /Bluetooth\s*[:：]?\s*([0-9.]+)/i },
-            { key: "ความละเอียด", regex: /(4K|8K|UHD|1080p|Full HD)/i },
+            { key: "ความละเอียด", regex: /(4K|8K|UHD|1080p|Full HD|QLED|OLED)/i },
             { key: "Refresh Rate", regex: /([0-9]+\s*(?:Hz|เฮิร์ตซ์))/i },
             { key: "ขนาดหน้าจอ", regex: /([0-9.]+\s*(?:นิ้ว|inch|"))/i },
             { key: "WiFi", regex: /(Wi-Fi\s*[0-9./a-z]+|Dual\s*Band)/i },
-            { key: "ระบบปฏิบัติการ", regex: /(Google\s*TV|Android\s*TV|Tizen|webOS|Windows\s*[0-9]+)/i },
+            { key: "ระบบปฏิบัติการ", regex: /(Google\s*TV|Android\s*TV|Tizen|webOS|Windows\s*[0-9]+|Android\s*[0-9]+|iOS\s*[0-9]+|macOS)/i },
             { key: "กำลังขับเสียง", regex: /([0-9]+\s*W)/i },
-            { key: "พาเนล", regex: /(OLED|QD-Mini\s*LED|Mini\s*LED|QLED|IPS|VA)/i },
+            { key: "พาเนล", regex: /(OLED|QD-Mini\s*LED|Mini\s*LED|QLED|IPS|VA|Retina|AMOLED)/i },
             { key: "Brightness", regex: /([0-9]+\s*nits)/i },
             { key: "Color Gamut", regex: /([0-9]+%\s*(?:DCI-P3|sRGB|NTSC))/i },
-            { key: "น้ำหนัก", regex: /([0-9.]+\s*kg)/i },
-            { key: "ชิปประมวลผล", regex: /(AiPQ\s*Pro|A[0-9]+\s*Bionic|Snapdragon\s*[0-9a-z ]+)/i },
+            { key: "น้ำหนัก", regex: /([0-9.]+\s*(?:kg|g|กรัม|กิโลกรัม))/i },
+            { key: "ชิปประมวลผล", regex: /(AiPQ\s*Pro|A[0-9]+\s*Bionic|Snapdragon\s*[0-9a-z ]+|Intel\s*Core\s*[i0-9-]+|Apple\s*M[0-9]+|Ryzen\s*[0-9]+)/i },
+            { key: "RAM", regex: /(RAM\s*[0-9]+\s*GB)/i },
+            { key: "ความจุ Storage", regex: /(ROM|SSD|Storage)\s*([0-9]+\s*(?:GB|TB))/i },
+            { key: "สวิตช์", regex: /(Blue|Red|Brown|Linear|Tactile|Optical|Mechanical)\s*Switch/i },
+            { key: "DPI", regex: /([0-9,.]+\s*DPI)/i },
+            { key: "การป้องกันน้ำ", regex: /(IP[0-9]+)/i },
         ];
         patterns.forEach(p => {
             const m = shopeeDesc.match(p.regex);
