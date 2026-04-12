@@ -153,7 +153,15 @@ function synthesizeExpertContentV2(name, rawSpecs, shopeeDesc, category) {
             { key: "บลูทูธ", regex: /Bluetooth\s*[:：]?\s*([0-9.]+)/i },
             { key: "ความละเอียด", regex: /(4K|8K|UHD|1080p|Full HD)/i },
             { key: "Refresh Rate", regex: /([0-9]+\s*(?:Hz|เฮิร์ตซ์))/i },
-            { key: "ขนาดหน้าจอ", regex: /([0-9]+\s*(?:นิ้ว|inch|"))/i },
+            { key: "ขนาดหน้าจอ", regex: /([0-9.]+\s*(?:นิ้ว|inch|"))/i },
+            { key: "WiFi", regex: /(Wi-Fi\s*[0-9./a-z]+|Dual\s*Band)/i },
+            { key: "ระบบปฏิบัติการ", regex: /(Google\s*TV|Android\s*TV|Tizen|webOS|Windows\s*[0-9]+)/i },
+            { key: "กำลังขับเสียง", regex: /([0-9]+\s*W)/i },
+            { key: "พาเนล", regex: /(OLED|QD-Mini\s*LED|Mini\s*LED|QLED|IPS|VA)/i },
+            { key: "Brightness", regex: /([0-9]+\s*nits)/i },
+            { key: "Color Gamut", regex: /([0-9]+%\s*(?:DCI-P3|sRGB|NTSC))/i },
+            { key: "น้ำหนัก", regex: /([0-9.]+\s*kg)/i },
+            { key: "ชิปประมวลผล", regex: /(AiPQ\s*Pro|A[0-9]+\s*Bionic|Snapdragon\s*[0-9a-z ]+)/i },
         ];
         patterns.forEach(p => {
             const m = shopeeDesc.match(p.regex);
@@ -209,7 +217,7 @@ function synthesizeExpertContentV2(name, rawSpecs, shopeeDesc, category) {
     const review = `บทวิเคราะห์จาก TechRank: ${name} รุ่นนี้ถือว่าเป็นตัวเลือกที่โดดเด่นในหมวด ${isDisplay ? 'จอภาพอัจฉริยะ' : cat} โดยเฉพาะเรื่องของ ${extractedSpecs.find(s => s.key.includes('ความละเอียด'))?.value || 'ประสิทธิภาพ'} ที่ทำออกมาได้มาตรฐานระพรีเมียม จากการวิเคราะห์สเปคพบว่าการออกแบบเน้นไปที่ ${isGaming || isDisplay ? 'คุณภาพการแสดงผลและการตอบสนอง' : 'ความสะดวกสบายในการใช้งานจริง'} สำหรับใครที่กำลังมองหา ${isDisplay ? 'ทีวีหรือจอมอนิเตอร์' : cat} ที่เน้น ${isDisplay ? 'สีสันและความคมชัด' : 'ความคุ้มค่า'} รุ่นนี้จะไม่ทำให้คุณผิดหวังแน่นอนครับ`;
 
     return {
-        description: review + "\n\n---\n\n" + (shopeeDesc?.substring(0, 1500) || ""),
+        description: review + "\n\n---\n\n" + (shopeeDesc?.substring(0, 5000) || ""),
         pros: pros.slice(0, 4),
         cons: cons.slice(0, 3),
         scores: {
@@ -219,7 +227,7 @@ function synthesizeExpertContentV2(name, rawSpecs, shopeeDesc, category) {
             build: Math.min(10, build),
             fps: Math.min(10, fps)
         },
-        specs: extractedSpecs.slice(0, 10)
+        specs: extractedSpecs.slice(0, 20)
     };
 }
 
